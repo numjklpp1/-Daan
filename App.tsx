@@ -257,6 +257,29 @@ export default function App() {
   const [inventorySearch, setInventorySearch] = useState('');
   const [calendarDate, setCalendarDate] = useState(new Date());
 
+  // 從資料庫獲取庫存
+  useEffect(() => {
+    const fetchInventory = async () => {
+      try {
+        const response = await fetch('/api/inventory');
+        const data = await response.json();
+        if (data && data.length > 0) {
+          setInventory(data);
+        } else {
+          // 如果資料庫是空的，同步初始資料
+          await fetch('/api/inventory/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items: inventory })
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch inventory:', error);
+      }
+    };
+    fetchInventory();
+  }, []);
+
   // 28天自動刪除邏輯
   useEffect(() => {
     const today = new Date();
@@ -274,21 +297,55 @@ export default function App() {
   const tripOrders = useMemo(() => orders.filter(o => currentTrip?.orderIds.includes(o.id)), [orders, currentTrip]);
   const currentVolume = useMemo(() => tripOrders.reduce((acc, o) => acc + o.items.reduce((sum, i) => sum + (i.quantity * (inventory.find(inv => inv.id === i.inventoryId)?.volume || 0)), 0), 0), [tripOrders, inventory]);
 
-  const handleUpdateStock = (id: string, delta: number) => {
+  const handleUpdateStock = async (id: string, delta: number) => {
     setInventory(prev => prev.map(i => i.id === id ? { ...i, quantity: Math.max(0, i.quantity + delta) } : i));
+    try {
+      await fetch('/api/inventory/update-stock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inventoryId: id, quantityChange: delta })
+      });
+    } catch (error) {
+      console.error('Failed to update stock on server:', error);
+    }
   };
 
-  const handleAddItem = (item: Omit<InventoryItem, 'id'>) => {
+  const handleAddItem = async (item: Omit<InventoryItem, 'id'>) => {
     const newItem = { ...item, id: `i${Date.now()}` };
     setInventory(prev => [...prev, newItem]);
+    try {
+      await fetch('/api/inventory/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: [newItem] })
+      });
+    } catch (error) {
+      console.error('Failed to add item to server:', error);
+    }
   };
 
-  const handleUpdateItem = (item: InventoryItem) => {
+  const handleUpdateItem = async (item: InventoryItem) => {
     setInventory(prev => prev.map(i => i.id === item.id ? item : i));
+    try {
+      await fetch('/api/inventory/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: [item] })
+      });
+    } catch (error) {
+      console.error('Failed to update item on server:', error);
+    }
   };
 
-  const handleDeleteItem = (id: string) => {
+  const handleDeleteItem = async (id: string) => {
     setInventory(prev => prev.filter(i => i.id !== id));
+    try {
+      await fetch(`/api/inventory/${id}`, {
+        method: 'DELETE'
+      });
+    } catch (error) {
+      console.error('Failed to delete item on server:', error);
+    }
   };
 
   const handleUpdateProcessItems = (update: ProcessItem[] | ((prev: ProcessItem[]) => ProcessItem[])) => {
@@ -459,16 +516,21 @@ export default function App() {
     });
   };
 
-  const handlePartToInventory = (frame: DoorFrame, qty: number) => {
+  const handlePartToInventory = async (frame: DoorFrame, qty: number) => {
     const targetCategory = frame.category === 'door' ? '門框' : '理想櫃';
+    let targetId = '';
+    
     // 1. 更新庫存管理中的數量
     setInventory(prev => {
       const existingItem = prev.find(i => i.sku === frame.sku && i.category === targetCategory);
       if (existingItem) {
+        targetId = existingItem.id;
         return prev.map(i => i.id === existingItem.id ? { ...i, quantity: i.quantity + qty } : i);
       } else {
+        const newId = `i-${Date.now()}`;
+        targetId = newId;
         const newItem: InventoryItem = {
-          id: `i-${Date.now()}`,
+          id: newId,
           sku: frame.sku,
           name: frame.name,
           quantity: qty,
@@ -479,9 +541,26 @@ export default function App() {
           weight: 0,
           volume: (frame.dimensions.h * frame.dimensions.w * frame.dimensions.d) / 1000000000
         };
+        
+        // 非同步同步到伺服器
+        fetch('/api/inventory/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: [newItem] })
+        }).catch(err => console.error('Failed to sync new item:', err));
+        
         return [...prev, newItem];
       }
     });
+
+    // 如果是現有項目，更新庫存
+    if (targetId && !targetId.startsWith('i-17')) { // 簡單檢查是否為現有項目
+       fetch('/api/inventory/update-stock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inventoryId: targetId, quantityChange: qty })
+      }).catch(err => console.error('Failed to update stock:', err));
+    }
 
     // 2. 更新零件管理中的數量 (移除已入庫的零件)
     setDoorFrames(prev => {
