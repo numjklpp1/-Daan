@@ -252,6 +252,7 @@ export default function App() {
 
   const [processItems, setProcessItems] = useState<ProcessItem[]>([]);
   const syncedProcessItemsRef = useRef<Set<string>>(new Set());
+  const isInitialLoadComplete = useRef(false);
 
   const [selectedTripId, setSelectedTripId] = useState<string | null>('t1');
   const [inventorySearch, setInventorySearch] = useState('');
@@ -259,37 +260,107 @@ export default function App() {
 
   // 從資料庫獲取庫存
   useEffect(() => {
-    const fetchInventory = async () => {
+    const fetchAll = async () => {
       try {
-        const response = await fetch('/api/inventory');
-        const data = await response.json();
-        if (data && data.length > 0) {
-          setInventory(data);
+        const [invRes, procRes, doorRes] = await Promise.all([
+          fetch('/api/inventory'),
+          fetch('/api/process-items'),
+          fetch('/api/door-frames')
+        ]);
+
+        const invData = await invRes.json();
+        const procData = await procRes.json();
+        const doorData = await doorRes.json();
+
+        if (invData && invData.length > 0) {
+          setInventory(invData);
         } else {
-          // 如果資料庫是空的，同步初始資料
           await fetch('/api/inventory/sync', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ items: inventory })
           });
         }
+
+        if (procData && procData.length > 0) {
+          setProcessItems(procData);
+          const syncedIds = new Set<string>();
+          procData.forEach((item: any) => {
+            if (item.section !== 'prep') syncedIds.add(item.id);
+          });
+          syncedProcessItemsRef.current = syncedIds;
+        }
+
+        if (doorData && doorData.length > 0) {
+          setDoorFrames(doorData);
+        }
+
+        isInitialLoadComplete.current = true;
       } catch (error) {
-        console.error('Failed to fetch inventory:', error);
+        console.error('Failed to fetch data:', error);
       }
     };
-    fetchInventory();
+    fetchAll();
   }, []);
+
+  // 同步流程管理到資料庫
+  useEffect(() => {
+    if (!isInitialLoadComplete.current) return;
+    const sync = async () => {
+      try {
+        await fetch('/api/process-items/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: processItems })
+        });
+      } catch (error) {
+        console.error('Failed to sync process items:', error);
+      }
+    };
+    sync();
+  }, [processItems]);
+
+  // 同步零件管理到資料庫
+  useEffect(() => {
+    if (!isInitialLoadComplete.current) return;
+    const sync = async () => {
+      try {
+        await fetch('/api/door-frames/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: doorFrames })
+        });
+      } catch (error) {
+        console.error('Failed to sync door frames:', error);
+      }
+    };
+    sync();
+  }, [doorFrames]);
 
   // 28天自動刪除邏輯
   useEffect(() => {
     const today = new Date();
-    setProcessItems(prev => prev.filter(item => {
-      if (item.section !== 'completed' || !item.createdAt) return true;
-      const createdDate = new Date(item.createdAt);
-      const diffTime = Math.abs(today.getTime() - createdDate.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      return diffDays <= 28;
-    }));
+    setProcessItems(prev => {
+      const toDelete = prev.filter(item => {
+        if (item.section !== 'completed' || !item.createdAt) return false;
+        const createdDate = new Date(item.createdAt);
+        const diffTime = Math.abs(today.getTime() - createdDate.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays > 28;
+      });
+
+      toDelete.forEach(item => {
+        fetch(`/api/process-items/${item.id}`, { method: 'DELETE' }).catch(err => console.error(err));
+      });
+
+      return prev.filter(item => {
+        if (item.section !== 'completed' || !item.createdAt) return true;
+        const createdDate = new Date(item.createdAt);
+        const diffTime = Math.abs(today.getTime() - createdDate.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays <= 28;
+      });
+    });
   }, []);
 
   const currentTrip = useMemo(() => trips.find(t => t.id === selectedTripId), [trips, selectedTripId]);
@@ -350,6 +421,15 @@ export default function App() {
 
   const handleUpdateProcessItems = (update: ProcessItem[] | ((prev: ProcessItem[]) => ProcessItem[])) => {
     setProcessItems(update);
+  };
+
+  const handleDeleteProcessItem = async (id: string) => {
+    setProcessItems(prev => prev.filter(i => i.id !== id));
+    try {
+      await fetch(`/api/process-items/${id}`, { method: 'DELETE' });
+    } catch (error) {
+      console.error('Failed to delete process item:', error);
+    }
   };
 
   // 自動同步流程管理到零件管理
@@ -431,12 +511,13 @@ export default function App() {
         section: nextSection, 
         quantity: moveQty,
         formula: moveQty.toString(),
-        createdAt: nextSection === 'completed' ? today : undefined
+        createdAt: (nextSection === 'completed' || nextSection === 'packaging') ? today : undefined
       };
       
       const remainingQty = Math.max(0, item.quantity - moveQty);
 
       if (remainingQty === 0) {
+        fetch(`/api/process-items/${id}`, { method: 'DELETE' }).catch(err => console.error(err));
         return [...prev.filter(i => i.id !== id), newItem];
       } else {
         return prev.map(i => i.id === id ? { ...i, quantity: remainingQty, formula: remainingQty.toString() } : i).concat(newItem);
@@ -466,6 +547,7 @@ export default function App() {
       const remainingQty = Math.max(0, currentItem.quantity - qty);
 
       if (remainingQty === 0) {
+        fetch(`/api/process-items/${id}`, { method: 'DELETE' }).catch(err => console.error(err));
         return [...prev.filter(i => i.id !== id), newItem];
       } else {
         return prev.map(i => i.id === id ? { ...i, quantity: remainingQty } : i).concat(newItem);
@@ -509,6 +591,7 @@ export default function App() {
       const remainingQty = Math.max(0, currentItem.quantity - moveQty);
 
       if (remainingQty === 0) {
+        fetch(`/api/door-frames/${id}`, { method: 'DELETE' }).catch(err => console.error(err));
         return [...prev.filter(f => f.id !== id), newItem];
       } else {
         return prev.map(f => f.id === id ? { ...f, quantity: remainingQty, formula: remainingQty.toString() } : f).concat(newItem);
@@ -566,6 +649,7 @@ export default function App() {
     setDoorFrames(prev => {
       const remainingQty = Math.max(0, frame.quantity - qty);
       if (remainingQty === 0) {
+        fetch(`/api/door-frames/${frame.id}`, { method: 'DELETE' }).catch(err => console.error(err));
         return prev.filter(f => f.id !== frame.id);
       } else {
         return prev.map(f => f.id === frame.id ? { ...f, quantity: remainingQty, formula: remainingQty.toString() } : f);
@@ -611,6 +695,7 @@ export default function App() {
               onUpdateItems={handleUpdateProcessItems}
               onMoveItem={handleProcessMove}
               onInventoryPut={handleInventoryPut}
+              onDeleteItem={handleDeleteProcessItem}
               onDeleteInventory={handleDeleteItem}
             />
           )}
@@ -619,9 +704,15 @@ export default function App() {
               subView={partsSubView}
               doorFrames={doorFrames}
               inventory={inventory}
-              onAdd={(f) => setDoorFrames([...doorFrames, { ...f, id: `df-${Date.now()}`, section: 'prep' }])}
+              onAdd={(f) => {
+                const id = `df-${Date.now()}`;
+                setDoorFrames([...doorFrames, { ...f, id, section: 'prep' }]);
+              }}
               onUpdate={(f) => setDoorFrames(doorFrames.map(df => df.id === f.id ? f : df))}
-              onDelete={(id) => setDoorFrames(doorFrames.filter(df => df.id !== id))}
+              onDelete={(id) => {
+                fetch(`/api/door-frames/${id}`, { method: 'DELETE' }).catch(err => console.error(err));
+                setDoorFrames(doorFrames.filter(df => df.id !== id));
+              }}
               onQuickUpdate={(id, delta) => setDoorFrames(doorFrames.map(df => df.id === id ? { ...df, quantity: Math.max(0, df.quantity + delta) } : df))}
               onMovePart={handlePartMove}
               onInventoryPut={handlePartToInventory}

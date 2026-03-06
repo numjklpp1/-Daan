@@ -77,6 +77,7 @@ interface Props {
   onUpdateItems: (items: ProcessItem[] | ((prev: ProcessItem[]) => ProcessItem[])) => void;
   onMoveItem: (id: string, qty: number) => void;
   onInventoryPut: (id: string, qty: number) => void;
+  onDeleteItem: (id: string) => void;
   onDeleteInventory: (id: string) => void;
 }
 
@@ -271,7 +272,7 @@ const ProcessCard = ({ item, section, onTransferClick, onPutClick, onUpdate, onU
   );
 };
 
-export const ProcessView: React.FC<Props> = ({ subView, items, inventory, onUpdateItems, onMoveItem, onInventoryPut, onDeleteInventory }) => {
+export const ProcessView: React.FC<Props> = ({ subView, items, inventory, onUpdateItems, onMoveItem, onInventoryPut, onDeleteItem, onDeleteInventory }) => {
   // Modal 狀態管理
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [transferModalOpen, setTransferModalOpen] = useState(false);
@@ -442,7 +443,7 @@ export const ProcessView: React.FC<Props> = ({ subView, items, inventory, onUpda
                   section={sec.key}
                   onTransferClick={handleTransferClick}
                   onPutClick={handlePutClick}
-                  onDelete={(id: string) => onUpdateItems(prev => prev.filter(pi => pi.id !== id))}
+                  onDelete={onDeleteItem}
                   onUpdate={(newQty: number) => onUpdateItems(prev => prev.map(pi => pi.id === item.id ? { ...pi, quantity: newQty } : pi))}
                   onUpdateNote={(newNote: string) => onUpdateItems(prev => prev.map(pi => pi.id === item.id ? { ...pi, note: newNote } : pi))}
                   onUpdateFormula={(newFormula: string, newTotal: number) => onUpdateItems(prev => prev.map(pi => pi.id === item.id ? { ...pi, formula: newFormula, quantity: newTotal } : pi))}
