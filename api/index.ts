@@ -8,7 +8,7 @@ dotenv.config();
 const app = express();
 
 // Database connection
-const sql = neon(process.env.DATABASE_URL || "postgresql://neondb_owner:npg_CO7pbVSm1YBG@ep-spring-paper-a1czhinz-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require");
+const sql = neon(process.env.DATABASE_URL!);
 
 app.use(cors());
 app.use(express.json());
