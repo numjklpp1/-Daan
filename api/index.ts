@@ -8,7 +8,10 @@ dotenv.config();
 const app = express();
 
 // Database connection
-const sql = neon(process.env.DATABASE_URL!);
+const dbUrl = process.env.DATABASE_URL!;
+const dbHost = dbUrl.split('@')[1]?.split('/')[0] || 'unknown';
+console.log(`[Database] Connecting to: ${dbHost}`);
+const sql = neon(dbUrl);
 
 app.use(cors());
 app.use(express.json());
