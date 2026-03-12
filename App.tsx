@@ -186,45 +186,45 @@ export default function App() {
   
   const [inventory, setInventory] = useState<InventoryItem[]>([
     // 理想櫃
-    ...['138(F把)', '138', 'UC2(70.5)', 'UC2', 'UC3', 'UD2(70.5)', 'UD2(F把)', 'UD2', 'UD3(F把)', 'UD3', 'UD3A', 'UD3A(70.5)', 'UD4', 'UD4A', 'UD4B', 'UD6', 'UN2', 'UN3', 'UP2', 'UP3', 'US2(70.5)', 'US2', 'US3', 'UG2A', 'UG3A'].map(name => ({
+    ...['138(F把)', '138', 'UC2(70.5)', 'UC2', 'UC3', 'UD2(70.5)', 'UD2(F把)', 'UD2', 'UD3(F把)', 'UD3', 'UD3A', 'UD3A(70.5)', 'UD4', 'UD4A', 'UD4B', 'UD6', 'UG2A', 'UG3A', 'UN2', 'UN3', 'UP2', 'UP3', 'US2(70.5)', 'US2', 'US3'].map(name => ({
       id: `i-${name}`,
       sku: name,
       name: name,
       quantity: 0,
       unit: '個',
       category: '理想櫃',
-      attribute: (['138(F把)', '138', 'UC2(70.5)', 'UC2', 'UC3', 'UD2(70.5)', 'UD2(F把)', 'UD2', 'UD3(F把)', 'UD3', 'UD3A', 'UD3A(70.5)', 'UD4', 'UD4A', 'UD4B', 'UD6', 'UP2', 'UP3'].includes(name) ? '抽屜' : (['UG2A', 'UG3A'].includes(name) ? '加框' : undefined)) as any,
+      attribute: getProductLabel(name) as any,
       dimensions: { h: 0, w: 0, d: 0 },
       weight: 0,
       volume: 0
     })),
     // 牆櫃
-    ...['AC2(70.5)', 'AC2', 'AC3', 'AD2(70.5)', 'AD2', 'AD3', 'AD3A', 'AD3A(70.5)', 'AD4', 'AD4B', 'AD6', 'AN1U', 'AO1H', 'AO1U', 'AO2B', 'AO2U', 'AO3B', 'AO3U', 'AO4B', 'AO4B2', 'AO5S', 'AS1H', 'AS1U', 'AS2B', 'AS2B(70.5)', 'AS2U', 'AS3B', 'AS3U', 'AK2B', 'AK2U', 'AK3B', 'AK3U'].map(name => ({
+    ...['AC2(70.5)', 'AC2', 'AC3', 'AD2(70.5)', 'AD2', 'AD3', 'AD3A', 'AD3A(70.5)', 'AD4', 'AD4B', 'AD6', 'AK2B', 'AK2U', 'AK3B', 'AK3U', 'AN1U', 'AO1H', 'AO1U', 'AO2B', 'AO2U', 'AO3B', 'AO3U', 'AO4B', 'AO4B2', 'AO5S', 'AS1H', 'AS1U', 'AS2B', 'AS2B(70.5)', 'AS2U', 'AS3B', 'AS3U'].map(name => ({
       id: `i-${name}`,
       sku: name,
       name: name,
       quantity: 0,
       unit: '個',
       category: '牆櫃',
-      attribute: (['AC2(70.5)', 'AC2', 'AC3', 'AD2(70.5)', 'AD2', 'AD3', 'AD3A', 'AD3A(70.5)', 'AD4', 'AD4B', 'AD6'].includes(name) ? '抽屜' : (['AK2B', 'AK2U', 'AK3B', 'AK3U'].includes(name) ? '加框' : undefined)) as any,
+      attribute: getProductLabel(name) as any,
       dimensions: { h: 0, w: 0, d: 0 },
       weight: 0,
       volume: 0
     })),
     // 其他鐵櫃
-    ...['CB2(70.5)', 'CB2', 'CB3', 'CB4', 'CT2(70.5)', 'CT2', 'CT3', 'CT4', 'CB2(2S1L)', 'CB2(4S)', 'CB3(2S12L)', 'CB3(4S1L)', 'CB3(6S)', 'CB4(2S3L)', 'CB4(4S2L)', 'CB4(6S1L)', 'CB4(8S)', 'DU11809M', 'DU118M', 'DU8809M', 'DU88M', 'KS118', 'KS88', 'R3M106', 'R3M180', '3M2T', 'R3M74', 'R3M90', '3M3T', '6M2T', '6M4T', 'R4M106', '4M106S', '4M2T', 'R4M74', '4M74S', 'R4M90', '4M3T', 'TaMh', 'TaS', 'TaL2T', 'TaL3T', 'TaMs', 'DU118G', 'DU88G', 'KG118', 'KG88', '4M106G', '4M74G'].map(name => ({
+    ...['訂做', 'CB2(70.5)', 'CB2', 'CB3', 'CB4', 'CT2(70.5)', 'CT2', 'CT3', 'CT4', 'DU11809M', 'DU118G', 'DU118M', 'DU8809M', 'DU88G', 'DU88M', 'KG118', 'KG88', 'KS118', 'KS88', 'R3M106', 'R3M180', '3M2T', 'R3M74', 'R3M90', '3M3T', '6M2T', '6M4T', '4M106G', 'R4M106', '4M106S', '4M2T', '4M74G', 'R4M74', '4M74S', 'R4M90', '4M3T', 'TaMh', 'TaS', 'TaL2T', 'TaL3T', 'TaMs'].map(name => ({
       id: `i-${name}`,
       sku: name,
       name: name,
       quantity: 0,
       unit: '個',
       category: '其他鐵櫃',
-      attribute: (['CB2(70.5)', 'CB2', 'CB3', 'CB4', 'CT2(70.5)', 'CT2', 'CT3', 'CT4', 'CB2(2S1L)', 'CB2(4S)', 'CB3(2S12L)', 'CB3(4S1L)', 'CB3(6S)', 'CB4(2S3L)', 'CB4(4S2L)', 'CB4(6S1L)', 'CB4(8S)'].includes(name) ? '抽屜' : (['DU118G', 'DU88G', 'KG118', 'KG88', '4M106G', '4M74G'].includes(name) ? '加框' : undefined)) as any,
+      attribute: getProductLabel(name) as any,
       dimensions: { h: 0, w: 0, d: 0 },
       weight: 0,
       volume: 0
     })),
-    // 門框
+    // 門框 (零件庫存)
     ...['UG2A', 'UG3A', 'AK2B', 'AK2U', 'AK3B', 'AK3U', 'DU118G', 'DU88G', 'KG118', 'KG88', '4M106G', '4M74G'].map(name => ({
       id: `i-df-${name}`,
       sku: name,
@@ -240,6 +240,11 @@ export default function App() {
   ]);
 
   const [doorFrames, setDoorFrames] = useState<DoorFrame[]>([]);
+  const doorFramesRef = useRef<DoorFrame[]>([]);
+  
+  useEffect(() => {
+    doorFramesRef.current = doorFrames;
+  }, [doorFrames]);
 
   const [orders, setOrders] = useState<Order[]>([
     { id: 'o1', orderNumber: 'ORD-2025-001', customerName: '台積中心', status: OrderStatus.PENDING, items: [{ id: 'oi1', inventoryId: 'i1', name: 'US2 桶身', quantity: 30, stackingStatus: '標準' }], createdAt: '2025-05-19', region: '新竹' },
@@ -283,16 +288,38 @@ export default function App() {
         }
 
         if (procData && procData.length > 0) {
-          setProcessItems(procData);
+          // 確保布林值正確
+          const normalizedProcData = procData.map((p: any) => ({
+            ...p,
+            isSyncedToParts: !!p.isSyncedToParts,
+            isPreparing: !!p.isPreparing
+          }));
+          setProcessItems(normalizedProcData);
+          
+          // 初始化已同步 ID 集合
           const syncedIds = new Set<string>();
-          procData.forEach((item: any) => {
-            if (item.section !== 'prep') syncedIds.add(item.id);
+          normalizedProcData.forEach((item: any) => {
+            if (item.section !== 'prep' || item.isSyncedToParts) {
+              syncedIds.add(item.id);
+            }
+          });
+          
+          // 從現有零件中恢復已同步的 ID
+          if (doorData && doorData.length > 0) {
+            doorData.forEach((df: any) => {
+              if (df.sourceProcessItemId) syncedIds.add(df.sourceProcessItemId);
+            });
+            setDoorFrames(doorData);
+          }
+          
+          syncedProcessItemsRef.current = syncedIds;
+        } else if (doorData && doorData.length > 0) {
+          setDoorFrames(doorData);
+          const syncedIds = new Set<string>();
+          doorData.forEach((df: any) => {
+            if (df.sourceProcessItemId) syncedIds.add(df.sourceProcessItemId);
           });
           syncedProcessItemsRef.current = syncedIds;
-        }
-
-        if (doorData && doorData.length > 0) {
-          setDoorFrames(doorData);
         }
 
         isInitialLoadComplete.current = true;
@@ -325,16 +352,89 @@ export default function App() {
     if (!isInitialLoadComplete.current) return;
     const sync = async () => {
       try {
+        // 只同步數量大於 0 的項目
+        const activeFrames = doorFrames.filter(f => f.quantity > 0);
         await fetch('/api/door-frames/sync', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items: doorFrames })
+          body: JSON.stringify({ items: activeFrames })
         });
       } catch (error) {
         console.error('Failed to sync door frames:', error);
       }
     };
     sync();
+  }, [doorFrames]);
+
+  // 零件堆疊邏輯：自動合併相同 SKU/名稱/分類/階段的項目
+  useEffect(() => {
+    if (!isInitialLoadComplete.current || doorFrames.length === 0) return;
+    
+    // 安全檢查：如果項目過多（例如發生無限迴圈），暫時跳過堆疊邏輯以防止瀏覽器當機
+    if (doorFrames.length > 5000) {
+      console.warn('Door frames count too high (>5000), skipping stacking logic for safety.');
+      return;
+    }
+
+    const groups: Record<string, DoorFrame[]> = {};
+    doorFrames.forEach(f => {
+      // 預備組的項目（特別是從流程管理同步過來的）不參與自動合併，以維持 1:1 追蹤
+      // 如果有備註，也不參與合併
+      const key = (f.section === 'prep' || f.note)
+        ? `unique-${f.id}` 
+        : `${f.sku}-${f.name}-${f.category}-${f.section}`;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(f);
+    });
+    
+    let hasChanges = false;
+    const nextFrames: DoorFrame[] = [];
+    const idsToDelete: string[] = [];
+    
+    Object.values(groups).forEach(group => {
+      let finalItem: DoorFrame | null = null;
+      if (group.length > 1) {
+        hasChanges = true;
+        // 合併邏輯
+        const merged = { ...group[0] };
+        // 確保合併後的項目保留 sourceProcessItemId (如果有的話)
+        if (!merged.sourceProcessItemId) {
+          const itemWithSource = group.find(f => f.sourceProcessItemId);
+          if (itemWithSource) merged.sourceProcessItemId = itemWithSource.sourceProcessItemId;
+        }
+        
+        for (let i = 1; i < group.length; i++) {
+          const f = group[i];
+          merged.quantity += f.quantity;
+          idsToDelete.push(f.id);
+          if (f.note && !merged.note?.includes(f.note)) {
+            merged.note = merged.note ? `${merged.note}; ${f.note}` : f.note;
+          }
+          if (f.targetDate && (!merged.targetDate || f.targetDate < merged.targetDate)) {
+            merged.targetDate = f.targetDate;
+          }
+        }
+        merged.formula = merged.quantity.toString();
+        finalItem = merged;
+      } else {
+        finalItem = group[0];
+      }
+
+      if (finalItem && finalItem.quantity > 0) {
+        nextFrames.push(finalItem);
+      } else if (finalItem) {
+        hasChanges = true;
+        idsToDelete.push(finalItem.id);
+      }
+    });
+    
+    if (hasChanges) {
+      setDoorFrames(nextFrames);
+      // 從資料庫刪除被合併掉的項目
+      idsToDelete.forEach(id => {
+        fetch(`/api/door-frames/${id}`, { method: 'DELETE' }).catch(err => console.error(err));
+      });
+    }
   }, [doorFrames]);
 
   // 28天自動刪除邏輯
@@ -423,29 +523,58 @@ export default function App() {
     setProcessItems(update);
   };
 
-  const handleDeleteProcessItem = async (id: string) => {
-    setProcessItems(prev => prev.filter(i => i.id !== id));
+  const handleClearPrepFrames = async () => {
     try {
-      await fetch(`/api/process-items/${id}`, { method: 'DELETE' });
+      await fetch('/api/door-frames/clear-prep', { method: 'POST' });
+      setDoorFrames(prev => prev.filter(df => df.section !== 'prep'));
     } catch (error) {
-      console.error('Failed to delete process item:', error);
+      console.error('Failed to clear prep frames:', error);
     }
   };
 
-  // 自動同步流程管理到零件管理
+  const handleDeleteProcessItem = async (id: string) => {
+    // 1. 刪除流程項目
+    setProcessItems(prev => prev.filter(i => i.id !== id));
+    
+    // 2. 同步刪除零件管理中對應的卡片 (僅限還在預備組 'prep' 的卡片)
+    setDoorFrames(prev => prev.filter(df => 
+      !(df.sourceProcessItemId === id && df.section === 'prep')
+    ));
+    syncedProcessItemsRef.current.delete(id);
+    
+    try {
+      // 3. 呼叫後端刪除流程項目
+      await fetch(`/api/process-items/${id}`, { method: 'DELETE' });
+      
+      // 4. 呼叫後端刪除對應的零件卡片
+      await fetch(`/api/door-frames/source/${id}`, { method: 'DELETE' });
+    } catch (error) {
+      console.error('Failed to delete process item or synced frames:', error);
+    }
+  };
+
+  // 自動同步流程管理到零件管理 (僅限新增對應貨品：加框與抽屜)
   useEffect(() => {
+    if (!isInitialLoadComplete.current) return;
+    
     let hasNewParts = false;
     const newParts: DoorFrame[] = [];
-    const updatedQtyMap = new Map<string, number>();
+    const newlySyncedIds: string[] = [];
 
     processItems.forEach(item => {
       const label = getProductLabel(item.name);
-      if (label === '抽屜' || label === '加框') {
-        // 如果是新項目，則新增
-        if (item.section === 'prep' && !syncedProcessItemsRef.current.has(item.id)) {
+      // 僅限「加框」與「抽屜」貨品
+      if (label === '加框' || label === '抽屜') {
+        const isAlreadySynced = syncedProcessItemsRef.current.has(item.id) || !!item.isSyncedToParts;
+        
+        // 額外檢查：如果 doorFrames 中已經存在該來源 ID 的項目，也視為已同步
+        const existsInFrames = doorFramesRef.current.some(df => df.sourceProcessItemId === item.id);
+        
+        // 如果是新項目且在預備組，則新增
+        if (item.section === 'prep' && !isAlreadySynced && !existsInFrames) {
           const invItem = inventory.find(i => i.id === item.inventoryId);
           const newPart: DoorFrame = {
-            id: `df-${Date.now()}-${Math.random()}`,
+            id: `df-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             sku: invItem?.sku || '',
             name: item.name,
             category: label === '抽屜' ? 'drawer' : 'door',
@@ -457,40 +586,28 @@ export default function App() {
             formula: item.quantity.toString(),
             dimensions: invItem?.dimensions || { h: 0, w: 0, d: 0 },
             createdAt: new Date().toISOString().split('T')[0],
-            sourceProcessItemId: item.id
+            sourceProcessItemId: item.id,
+            note: item.note
           };
           newParts.push(newPart);
           syncedProcessItemsRef.current.add(item.id);
+          newlySyncedIds.push(item.id);
           hasNewParts = true;
-        } else {
-          // 記錄已存在項目的最新數量
-          updatedQtyMap.set(item.id, item.quantity);
+        } else if (!item.isSyncedToParts && (isAlreadySynced || existsInFrames)) {
+          // 如果還沒標記為 synced，補標記
+          newlySyncedIds.push(item.id);
         }
       }
     });
 
-    if (hasNewParts || updatedQtyMap.size > 0) {
-      setDoorFrames(current => {
-        let changed = false;
-        let next = current.map(df => {
-          if (df.sourceProcessItemId && updatedQtyMap.has(df.sourceProcessItemId)) {
-            const newQty = updatedQtyMap.get(df.sourceProcessItemId)!;
-            // 只同步預備組的數量，且數量有變動時才更新
-            if (df.section === 'prep' && df.quantity !== newQty) {
-              changed = true;
-              return { ...df, quantity: newQty, formula: newQty.toString() };
-            }
-          }
-          return df;
-        });
+    if (hasNewParts || newlySyncedIds.length > 0) {
+      if (newlySyncedIds.length > 0) {
+        setProcessItems(prev => prev.map(p => newlySyncedIds.includes(p.id) ? { ...p, isSyncedToParts: true } : p));
+      }
 
-        if (newParts.length > 0) {
-          next = [...next, ...newParts];
-          changed = true;
-        }
-
-        return changed ? next : current;
-      });
+      if (newParts.length > 0) {
+        setDoorFrames(current => [...current, ...newParts]);
+      }
     }
   }, [processItems, inventory]);
 
@@ -498,6 +615,12 @@ export default function App() {
     setProcessItems(prev => {
       const item = prev.find(i => i.id === id);
       if (!item) return prev;
+
+      // 如果處於「備貨中」，禁止進入下一階段
+      if (item.isPreparing) {
+        alert('該貨品目前處於「備貨中」，無法轉移至下一階段。請先確認門框零件庫存。');
+        return prev;
+      }
       
       let nextSection: ProcessSection = 'shell';
       if (item.section === 'prep') nextSection = 'shell';
@@ -525,11 +648,106 @@ export default function App() {
     });
   };
 
+  // 自動取消「備貨中」狀態：當門框庫存更新且足以供應預備組需求時
+  useEffect(() => {
+    if (!isInitialLoadComplete.current) return;
+
+    const itemsToDeduct: { inventoryId: string, quantity: number }[] = [];
+
+    setProcessItems(prev => {
+      let hasChanges = false;
+      const next = prev.map(item => {
+        // 只針對「預備組」且標記為「備貨中」的項目
+        if (item.section === 'prep' && item.isPreparing) {
+          const label = getProductLabel(item.name);
+          if (label === '加框') {
+            const invItem = inventory.find(i => i.id === item.inventoryId);
+            if (invItem) {
+              // 尋找對應的門框零件庫存
+              const dfItem = inventory.find(i => i.sku === invItem.sku && i.category === '門框');
+              // 如果庫存大於等於需求量，自動取消備貨中並準備扣除庫存
+              if (dfItem && dfItem.quantity >= item.quantity) {
+                hasChanges = true;
+                itemsToDeduct.push({ inventoryId: dfItem.id, quantity: item.quantity });
+                return { ...item, isPreparing: false };
+              }
+            }
+          }
+        }
+        return item;
+      });
+
+      return hasChanges ? next : prev;
+    });
+
+    // 處理剛轉為正常的項目庫存扣除
+    if (itemsToDeduct.length > 0) {
+      setInventory(prevInv => {
+        let nextInv = [...prevInv];
+        itemsToDeduct.forEach(deduction => {
+          const target = nextInv.find(i => i.id === deduction.inventoryId);
+          if (target) {
+            // 發送 API 請求更新資料庫
+            fetch('/api/inventory/update-stock', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ inventoryId: target.id, quantityChange: -deduction.quantity })
+            }).catch(err => console.error('Failed to update door frame stock on transition:', err));
+            
+            nextInv = nextInv.map(i => i.id === target.id ? { ...i, quantity: Math.max(0, i.quantity - deduction.quantity) } : i);
+          }
+        });
+        return nextInv;
+      });
+    }
+  }, [inventory]);
+
+  const handleAddProcessItem = (item: Omit<ProcessItem, 'id'>) => {
+    const id = `pi-${Date.now()}`;
+    const newItem = { ...item, id };
+    
+    setProcessItems(prev => [...prev, newItem]);
+
+    // 如果是「加框」貨品且加入「預備組」，且「不是備貨中」，扣掉「門框」類別的庫存
+    if (item.section === 'prep' && !item.isPreparing) {
+      const label = getProductLabel(item.name);
+      if (label === '加框') {
+        setInventory(prevInv => {
+          const invItem = prevInv.find(i => i.id === item.inventoryId);
+          if (invItem) {
+            const dfItem = prevInv.find(i => i.sku === invItem.sku && i.category === '門框');
+            if (dfItem) {
+              // 發送 API 請求更新資料庫
+              fetch('/api/inventory/update-stock', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ inventoryId: dfItem.id, quantityChange: -item.quantity })
+              }).catch(err => console.error('Failed to update door frame stock:', err));
+              
+              // 更新本地狀態
+              return prevInv.map(i => i.id === dfItem.id ? { ...i, quantity: Math.max(0, i.quantity - item.quantity) } : i);
+            }
+          }
+          return prevInv;
+        });
+      }
+    }
+  };
+
   const handleInventoryPut = (id: string, qty: number) => {
     const item = processItems.find(i => i.id === id);
-    if (!item) return;
+    if (!item) {
+      console.error('Item not found in processItems:', id);
+      return;
+    }
 
+    console.log('Handling inventory put for:', item.name, 'qty:', qty);
+
+    // 1. 更新櫃子庫存
     handleUpdateStock(item.inventoryId, qty);
+    
+    // 2. 取消在此處扣除門框數量，已改為在預備組新增時扣除
+
     const today = new Date().toISOString().split('T')[0];
 
     setProcessItems(prev => {
@@ -596,6 +814,23 @@ export default function App() {
       } else {
         return prev.map(f => f.id === id ? { ...f, quantity: remainingQty, formula: remainingQty.toString() } : f).concat(newItem);
       }
+    });
+  };
+
+  const handlePartSplit = (id: string, splitQty: number) => {
+    setDoorFrames(prev => {
+      const currentItem = prev.find(f => f.id === id);
+      if (!currentItem || splitQty <= 0 || splitQty >= currentItem.quantity) return prev;
+      
+      const newItem: DoorFrame = { 
+        ...currentItem, 
+        id: `df-split-${Date.now()}`, 
+        quantity: splitQty,
+        formula: splitQty.toString()
+      };
+
+      const remainingQty = currentItem.quantity - splitQty;
+      return prev.map(f => f.id === id ? { ...f, quantity: remainingQty, formula: remainingQty.toString() } : f).concat(newItem);
     });
   };
 
@@ -693,6 +928,7 @@ export default function App() {
               items={processItems} 
               inventory={inventory}
               onUpdateItems={handleUpdateProcessItems}
+              onAddItem={handleAddProcessItem}
               onMoveItem={handleProcessMove}
               onInventoryPut={handleInventoryPut}
               onDeleteItem={handleDeleteProcessItem}
@@ -705,17 +941,19 @@ export default function App() {
               doorFrames={doorFrames}
               inventory={inventory}
               onAdd={(f) => {
-                const id = `df-${Date.now()}`;
-                setDoorFrames([...doorFrames, { ...f, id, section: 'prep' }]);
+                const id = `df-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                setDoorFrames(prev => [...prev, { ...f, id, section: 'prep' }]);
               }}
-              onUpdate={(f) => setDoorFrames(doorFrames.map(df => df.id === f.id ? f : df))}
+              onUpdate={(f) => setDoorFrames(prev => prev.map(df => df.id === f.id ? f : df))}
               onDelete={(id) => {
                 fetch(`/api/door-frames/${id}`, { method: 'DELETE' }).catch(err => console.error(err));
-                setDoorFrames(doorFrames.filter(df => df.id !== id));
+                setDoorFrames(prev => prev.filter(df => df.id !== id));
               }}
-              onQuickUpdate={(id, delta) => setDoorFrames(doorFrames.map(df => df.id === id ? { ...df, quantity: Math.max(0, df.quantity + delta) } : df))}
+              onQuickUpdate={(id, delta) => setDoorFrames(prev => prev.map(df => df.id === id ? { ...df, quantity: Math.max(0, df.quantity + delta) } : df))}
               onMovePart={handlePartMove}
+              onSplitPart={handlePartSplit}
               onInventoryPut={handlePartToInventory}
+              onDeleteAll={handleClearPrepFrames}
             />
           )}
           {activeView === 'trips' && (

@@ -64,7 +64,7 @@ export const DRAWER_ITEMS = [
   '138(F把)', '138', 'UC2(70.5)', 'UC2', 'UC3', 'UD2(70.5)',
   'UD2(F把)', 'UD2', 'UD3(F把)', 'UD3', 'UD3A', 'UD3A(70.5)',
   'UD4', 'UD4A', 'UD4B', 'UD6', 'UP2', 'UP3', 'AC2(70.5)', 'AC2', 'AC3', 'AD2(70.5)', 'AD2', 'AD3', 'AD3A', 'AD3A(70.5)', 'AD4', 'AD4B', 'AD6', 'CB2(70.5)', 'CB2', 'CB3', 'CB4', 'CT2(70.5)', 'CT2',
-  'CT3', 'CT4', 'CB2(2S1L)', 'CB2(4S)', 'CB3(2S12L)', 'CB3(4S1L)', 'CB3(6S)', 'CB4(2S3L)', 'CB4(4S2L)', 'CB4(6S1L)', 'CB4(8S)'
+  'CT3', 'CT4', 'TaMh', 'TaS', 'TaL2T', 'TaL3T', 'TaMs', '3M2T', '3M3T', '6M2T', '6M4T', '4M2T', '4M3T'
 ];
 
 export const FRAMED_ITEMS = [

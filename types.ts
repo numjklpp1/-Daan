@@ -29,6 +29,7 @@ export interface ProcessItem {
   isPreparing?: boolean;
   createdAt?: string; // 格式: YYYY-MM-DD
   targetDate?: string; // 格式: YYYY-MM-DD
+  isSyncedToParts?: boolean;
 }
 
 export interface Company {

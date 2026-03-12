@@ -79,7 +79,9 @@ interface Props {
   onDelete: (id: string) => void;
   onQuickUpdate: (id: string, delta: number) => void;
   onMovePart: (id: string, qty: number) => void;
+  onSplitPart: (id: string, qty: number) => void;
   onInventoryPut: (frame: DoorFrame, qty: number) => void;
+  onDeleteAll?: () => void;
 }
 
 const DRAWER_CONFIGS: Record<string, string> = {
@@ -130,7 +132,7 @@ const DRAWER_CONFIGS: Record<string, string> = {
   'CB4(8S)': 'cbS:8',
 };
 
-const PartCard = ({ frame, section, onTransferClick, onPutClick, onUpdate, onUpdateNote, onUpdateFormula, onDelete, onOpenDateSelector }: any) => {
+const PartCard = ({ frame, section, onTransferClick, onSplitClick, onPutClick, onUpdate, onUpdateNote, onUpdateFormula, onDelete, onOpenDateSelector }: any) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const total = frame.quantity;
@@ -268,12 +270,22 @@ const PartCard = ({ frame, section, onTransferClick, onPutClick, onUpdate, onUpd
                 </div>
                 <div className="flex gap-1.5">
                   {!isStock ? (
-                    <button 
-                      onClick={() => onTransferClick(frame.id, total)} 
-                      className="px-4 py-2 bg-blue-600 text-white text-[11px] font-black rounded-xl hover:bg-blue-500 shadow-lg shadow-blue-600/20 active:scale-95 transition-all"
-                    >
-                      轉移
-                    </button>
+                    <div className="flex gap-1.5">
+                      {section === 'prep' && (
+                        <button 
+                          onClick={() => onSplitClick(frame.id, total)} 
+                          className="px-4 py-2 bg-amber-600 text-white text-[11px] font-black rounded-xl hover:bg-amber-500 shadow-lg shadow-amber-600/20 active:scale-95 transition-all"
+                        >
+                          分割
+                        </button>
+                      )}
+                      <button 
+                        onClick={() => onTransferClick(frame.id, total)} 
+                        className="px-4 py-2 bg-blue-600 text-white text-[11px] font-black rounded-xl hover:bg-blue-500 shadow-lg shadow-blue-600/20 active:scale-95 transition-all"
+                      >
+                        轉移
+                      </button>
+                    </div>
                   ) : (
                     <button 
                       onClick={() => onPutClick(frame, total)} 
@@ -325,18 +337,22 @@ const PartCard = ({ frame, section, onTransferClick, onPutClick, onUpdate, onUpd
   );
 };
 
-export const DoorFrameView: React.FC<Props> = ({ subView, doorFrames, inventory, onAdd, onUpdate, onDelete, onQuickUpdate, onMovePart, onInventoryPut }) => {
+export const DoorFrameView: React.FC<Props> = ({ subView, doorFrames, inventory, onAdd, onUpdate, onDelete, onQuickUpdate, onMovePart, onSplitPart, onInventoryPut, onDeleteAll }) => {
   const [modalOpen, setModalOpen] = useState(false);
   const [inventoryModalOpen, setInventoryModalOpen] = useState(false);
   const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [splitModalOpen, setSplitModalOpen] = useState(false);
   const [dateModalOpen, setDateModalOpen] = useState(false);
   
   const [editingFrame, setEditingFrame] = useState<DoorFrame | null>(null);
   const [targetTransferItem, setTargetTransferItem] = useState<DoorFrame | null>(null);
+  const [targetSplitItem, setTargetSplitItem] = useState<DoorFrame | null>(null);
   const [targetDateItem, setTargetDateItem] = useState<DoorFrame | null>(null);
   const [tempDate, setTempDate] = useState('');
   const [transferInputQty, setTransferInputQty] = useState('0');
+  const [splitInputQty, setSplitInputQty] = useState('0');
   const [maxTransferQty, setMaxTransferQty] = useState(0);
+  const [maxSplitQty, setMaxSplitQty] = useState(0);
 
   const [invSearchTerm, setInvSearchTerm] = useState('');
   const [selectedInvItem, setSelectedInvItem] = useState<InventoryItem | null>(null);
@@ -476,12 +492,29 @@ export const DoorFrameView: React.FC<Props> = ({ subView, doorFrames, inventory,
     setTransferModalOpen(true);
   };
 
+  const handleSplitClick = (id: string, currentTotal: number) => {
+    const frame = doorFrames.find(f => f.id === id);
+    if (!frame) return;
+    setTargetSplitItem(frame);
+    setMaxSplitQty(currentTotal - 1); // 至少留 1 個在原卡片
+    setSplitInputQty('1');
+    setSplitModalOpen(true);
+  };
+
   const handleConfirmTransfer = () => {
     if (!targetTransferItem) return;
     const qty = parseInt(transferInputQty) || 0;
     onMovePart(targetTransferItem.id, qty);
     setTransferModalOpen(false);
     setTargetTransferItem(null);
+  };
+
+  const handleConfirmSplit = () => {
+    if (!targetSplitItem) return;
+    const qty = parseInt(splitInputQty) || 0;
+    onSplitPart(targetSplitItem.id, qty);
+    setSplitModalOpen(false);
+    setTargetSplitItem(null);
   };
 
   const handleOpenDateSelector = (frame: DoorFrame) => {
@@ -532,12 +565,29 @@ export const DoorFrameView: React.FC<Props> = ({ subView, doorFrames, inventory,
                 </span>
               </h3>
               {sec.key === 'prep' && (
-                <button 
-                  onClick={() => setInventoryModalOpen(true)}
-                  className="p-2.5 bg-slate-800 text-slate-400 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-lg active:scale-95 border border-slate-700"
-                >
-                  <Icons.Plus />
-                </button>
+                <div className="flex items-center gap-2">
+                  {sectionParts.length > 0 && (
+                    <button 
+                      onClick={() => {
+                        if (onDeleteAll) {
+                          onDeleteAll();
+                        } else {
+                          sectionParts.forEach(frame => onDelete(frame.id));
+                        }
+                      }}
+                      className="p-2.5 bg-rose-600/10 text-rose-500 rounded-xl hover:bg-rose-600 hover:text-white transition-all shadow-lg active:scale-95 border border-rose-600/20"
+                      title="一鍵刪除所有卡片"
+                    >
+                      <Icons.Trash />
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => setInventoryModalOpen(true)}
+                    className="p-2.5 bg-slate-800 text-slate-400 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-lg active:scale-95 border border-slate-700"
+                  >
+                    <Icons.Plus />
+                  </button>
+                </div>
               )}
             </div>
             
@@ -548,6 +598,7 @@ export const DoorFrameView: React.FC<Props> = ({ subView, doorFrames, inventory,
                     frame={frame} 
                     section={sec.key}
                     onTransferClick={handleTransferClick}
+                    onSplitClick={handleSplitClick}
                     onPutClick={onInventoryPut}
                     onDelete={onDelete}
                     onUpdate={onUpdate}
@@ -697,6 +748,54 @@ export const DoorFrameView: React.FC<Props> = ({ subView, doorFrames, inventory,
                 className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-base uppercase shadow-2xl shadow-blue-600/30 hover:bg-blue-500 transition-all disabled:opacity-50 active:scale-[0.98]"
               >
                 確認轉移至 {targetTransferItem.section === 'prep' ? (currentCategory === 'door' ? '門框製作' : '抽屜製作') : (currentCategory === 'door' ? '門框成品' : '抽屜成品')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 分割確認 Modal */}
+      {splitModalOpen && targetSplitItem && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[110] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-[32px] sm:rounded-[40px] w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200 my-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-lg sm:text-xl font-black text-white">確認分割數量</h3>
+              <button onClick={() => setSplitModalOpen(false)} className="text-slate-500 hover:text-white">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              <div className="p-5 bg-slate-950 border border-slate-800 rounded-2xl">
+                <p className="text-sm font-black text-white mb-1">{targetSplitItem.name}</p>
+                <div className="flex justify-between items-center">
+                  <p className="text-[10px] text-slate-500 font-bold uppercase">目前可用總數</p>
+                  <p className="text-lg font-black text-amber-500">{targetSplitItem.quantity}</p>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-black text-slate-500 mb-2 block uppercase tracking-widest">欲分割出的數量</label>
+                <input 
+                  type="text" inputMode="numeric"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-4 px-6 text-4xl font-black text-center text-amber-400 focus:ring-2 focus:ring-amber-600 outline-none shadow-inner"
+                  value={splitInputQty}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/[^0-9]/g, '');
+                    const n = parseInt(val) || 0;
+                    setSplitInputQty(Math.min(n, maxSplitQty).toString());
+                  }}
+                  autoFocus
+                />
+                <p className="text-[10px] text-slate-600 mt-2 text-center font-bold">分割後原項目將保留 {targetSplitItem.quantity - (parseInt(splitInputQty) || 0)} 個</p>
+              </div>
+
+              <button 
+                onClick={handleConfirmSplit}
+                disabled={parseInt(splitInputQty) <= 0}
+                className="w-full py-5 bg-amber-600 text-white rounded-2xl font-black text-base uppercase shadow-2xl shadow-amber-600/30 hover:bg-amber-500 transition-all disabled:opacity-50 active:scale-[0.98]"
+              >
+                確認分割
               </button>
             </div>
           </div>

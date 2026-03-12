@@ -98,6 +98,7 @@ interface Props {
   items: ProcessItem[];
   inventory: InventoryItem[];
   onUpdateItems: (items: ProcessItem[] | ((prev: ProcessItem[]) => ProcessItem[])) => void;
+  onAddItem: (item: Omit<ProcessItem, 'id'>) => void;
   onMoveItem: (id: string, qty: number) => void;
   onInventoryPut: (id: string, qty: number) => void;
   onDeleteItem: (id: string) => void;
@@ -109,8 +110,9 @@ const ProcessCard = ({ item, section, onTransferClick, onPutClick, onUpdate, onU
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const total = item.quantity;
 
-  // 檢查是否允許轉移 (預備組限定: 必須是目標日期的前一天)
+  // 檢查是否允許轉移 (預備組限定: 必須是目標日期的前一天，且不能處於備貨中)
   const isTransferAllowed = useMemo(() => {
+    if (item.isPreparing) return false;
     if (section !== 'prep' || !item.targetDate) return true;
     
     try {
@@ -323,7 +325,7 @@ const SortableProcessCard = (props: any) => {
   );
 };
 
-export const ProcessView: React.FC<Props> = ({ subView, items, inventory, onUpdateItems, onMoveItem, onInventoryPut, onDeleteItem, onDeleteInventory }) => {
+export const ProcessView: React.FC<Props> = ({ subView, items, inventory, onUpdateItems, onAddItem, onMoveItem, onInventoryPut, onDeleteItem, onDeleteInventory }) => {
   const [activeId, setActiveId] = useState<string | null>(null);
 
   // DnD Sensors
@@ -392,6 +394,17 @@ export const ProcessView: React.FC<Props> = ({ subView, items, inventory, onUpda
   const [putInputQty, setPutInputQty] = useState<string>('0');
   const [maxPutQty, setMaxPutQty] = useState(0);
 
+  // 門框庫存檢查
+  const availableDoorFrameStock = useMemo(() => {
+    if (!selectedItem) return null;
+    const label = getProductLabel(selectedItem.name);
+    if (label !== '加框') return null;
+    
+    // 尋找庫存中類別為「門框」且 SKU 相同的項目
+    const dfItem = inventory.find(i => i.sku === selectedItem.sku && i.category === '門框');
+    return dfItem ? dfItem.quantity : 0;
+  }, [selectedItem, inventory]);
+
   const categories = ['all', '理想櫃', '牆櫃', '其他鐵櫃'];
 
   const sections: { key: ProcessSection; label: string; color: string }[] = [
@@ -404,6 +417,9 @@ export const ProcessView: React.FC<Props> = ({ subView, items, inventory, onUpda
 
   const filteredInventory = useMemo(() => {
     return inventory.filter(i => {
+      // 流程管理不直接新增門框零件，避免與櫃子品項重複顯示
+      if (i.category === '門框') return false;
+      
       const matchesSearch = i.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                            i.sku.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesCategory = selectedCategory === 'all' || i.category === selectedCategory;
@@ -424,19 +440,28 @@ export const ProcessView: React.FC<Props> = ({ subView, items, inventory, onUpda
     const qty = parseInt(addQty) || 0;
     if (qty <= 0) return;
 
-    onUpdateItems(prev => [
-      ...prev,
-      { 
-        id: `pi-${Date.now()}`, 
-        inventoryId: selectedItem.id, 
-        name: selectedItem.name, 
-        quantity: qty, 
-        formula: qty.toString(),
-        section: activeSection 
+    // 預備組新增加框貨品時的庫存檢查
+    let isPreparing = false;
+    if (activeSection === 'prep' && availableDoorFrameStock !== null) {
+      if (qty > availableDoorFrameStock) {
+        alert(`庫存不足！門框成品組目前僅剩 ${availableDoorFrameStock} 個 ${selectedItem.sku}。系統將自動標記為「備貨中」。`);
+        isPreparing = true;
       }
-    ]);
+    }
+
+    onAddItem({ 
+      inventoryId: selectedItem.id, 
+      name: selectedItem.name, 
+      quantity: qty, 
+      formula: qty.toString(),
+      section: activeSection,
+      isPreparing: isPreparing
+    });
 
     setAddModalOpen(false);
+    setSelectedItem(null);
+    setSearchTerm('');
+    setAddQty('1');
   };
 
   const handleTransferClick = (id: string, currentTotal: number) => {
@@ -735,6 +760,14 @@ export const ProcessView: React.FC<Props> = ({ subView, items, inventory, onUpda
                 <div className="p-6 bg-blue-600/10 border border-blue-600/20 rounded-3xl">
                   <p className="text-[10px] text-blue-500 font-black uppercase mb-1">已選擇貨品</p>
                   <p className="text-2xl font-black text-white">{selectedItem.name}</p>
+                  {availableDoorFrameStock !== null && (
+                    <div className="mt-3 pt-3 border-t border-blue-600/20 flex justify-between items-center">
+                      <p className="text-[10px] text-slate-500 font-black uppercase">門框成品庫存</p>
+                      <p className={`text-sm font-black ${availableDoorFrameStock > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                        {availableDoorFrameStock} 個
+                      </p>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="text-sm font-black text-slate-400 mb-2 block">輸入數量</label>

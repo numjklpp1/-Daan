@@ -46,8 +46,12 @@ async function initDb() {
         formula TEXT,
         is_preparing BOOLEAN,
         created_at TEXT,
-        target_date TEXT
+        target_date TEXT,
+        is_synced_to_parts BOOLEAN DEFAULT FALSE
       );
+    `;
+    await sql`
+      ALTER TABLE process_items ADD COLUMN IF NOT EXISTS is_synced_to_parts BOOLEAN DEFAULT FALSE;
     `;
     await sql`
       CREATE TABLE IF NOT EXISTS door_frames (
@@ -112,9 +116,10 @@ app.get("/api/process-items", async (req, res) => {
       section: row.section,
       note: row.note,
       formula: row.formula,
-      isPreparing: row.is_preparing,
+      isPreparing: !!row.is_preparing,
       createdAt: row.created_at,
-      targetDate: row.target_date
+      targetDate: row.target_date,
+      isSyncedToParts: !!row.is_synced_to_parts
     }));
     res.json(items);
   } catch (error) {
@@ -129,8 +134,20 @@ app.post("/api/process-items/sync", async (req, res) => {
     // UPSERT is better
     for (const item of items) {
       await sql`
-        INSERT INTO process_items (id, inventory_id, name, quantity, section, note, formula, is_preparing, created_at, target_date)
-        VALUES (${item.id}, ${item.inventoryId}, ${item.name}, ${item.quantity}, ${item.section}, ${item.note}, ${item.formula}, ${item.isPreparing}, ${item.createdAt}, ${item.targetDate})
+        INSERT INTO process_items (id, inventory_id, name, quantity, section, note, formula, is_preparing, created_at, target_date, is_synced_to_parts)
+        VALUES (
+          ${item.id}, 
+          ${item.inventoryId}, 
+          ${item.name}, 
+          ${item.quantity}, 
+          ${item.section}, 
+          ${item.note}, 
+          ${item.formula}, 
+          ${item.isPreparing ? 1 : 0}, 
+          ${item.createdAt}, 
+          ${item.targetDate}, 
+          ${item.isSyncedToParts ? 1 : 0}
+        )
         ON CONFLICT (id) DO UPDATE SET
           inventory_id = EXCLUDED.inventory_id,
           name = EXCLUDED.name,
@@ -140,7 +157,8 @@ app.post("/api/process-items/sync", async (req, res) => {
           formula = EXCLUDED.formula,
           is_preparing = EXCLUDED.is_preparing,
           created_at = EXCLUDED.created_at,
-          target_date = EXCLUDED.target_date;
+          target_date = EXCLUDED.target_date,
+          is_synced_to_parts = EXCLUDED.is_synced_to_parts;
       `;
     }
     res.json({ success: true });
@@ -191,7 +209,11 @@ app.post("/api/door-frames/sync", async (req, res) => {
     for (const item of items) {
       await sql`
         INSERT INTO door_frames (id, sku, name, category, section, material, direction, color, quantity, note, formula, is_preparing, created_at, target_date, source_process_item_id, h, w, d)
-        VALUES (${item.id}, ${item.sku}, ${item.name}, ${item.category}, ${item.section}, ${item.material}, ${item.direction}, ${item.color}, ${item.quantity}, ${item.note}, ${item.formula}, ${item.isPreparing}, ${item.createdAt}, ${item.targetDate}, ${item.sourceProcessItemId}, ${item.dimensions.h}, ${item.dimensions.w}, ${item.dimensions.d})
+        VALUES (
+          ${item.id}, ${item.sku}, ${item.name}, ${item.category}, ${item.section}, ${item.material}, ${item.direction}, ${item.color}, ${item.quantity}, ${item.note}, ${item.formula}, 
+          ${item.isPreparing ? 1 : 0}, 
+          ${item.createdAt}, ${item.targetDate}, ${item.sourceProcessItemId}, ${item.dimensions.h}, ${item.dimensions.w}, ${item.dimensions.d}
+        )
         ON CONFLICT (id) DO UPDATE SET
           sku = EXCLUDED.sku,
           name = EXCLUDED.name,
@@ -224,6 +246,25 @@ app.delete("/api/door-frames/:id", async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: "Failed to delete door frame" });
+  }
+});
+
+app.delete("/api/door-frames/source/:sourceId", async (req, res) => {
+  try {
+    // 僅刪除處於 'prep' (預備組) 階段的零件
+    await sql`DELETE FROM door_frames WHERE source_process_item_id = ${req.params.sourceId} AND section = 'prep'`;
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to delete door frames by source" });
+  }
+});
+
+app.post("/api/door-frames/clear-prep", async (req, res) => {
+  try {
+    await sql`DELETE FROM door_frames WHERE section = 'prep'`;
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to clear prep frames" });
   }
 });
 
