@@ -716,9 +716,11 @@ export default function App() {
       else if (item.section === 'packaging') nextSection = 'completed'; // 內部流轉至 hidden section
 
       const today = new Date().toISOString().split('T')[0];
+      const isFullMove = moveQty === item.quantity;
+      
       const newItem: ProcessItem = { 
         ...item, 
-        id: `pi-${Date.now()}`, 
+        id: isFullMove ? item.id : `pi-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, 
         section: nextSection, 
         quantity: moveQty,
         formula: moveQty.toString(),
@@ -728,9 +730,10 @@ export default function App() {
       const remainingQty = Math.max(0, item.quantity - moveQty);
 
       if (remainingQty === 0) {
-        fetch(`/api/process-items/${id}`, { method: 'DELETE' }).catch(err => console.error(err));
-        return [...prev.filter(i => i.id !== id), newItem];
+        // 全量轉移，直接更新該項目的 section，不刪除舊 ID
+        return prev.map(i => i.id === id ? newItem : i);
       } else {
+        // 部分轉移，保留原項目並新增一個新 ID 的項目
         return prev.map(i => i.id === id ? { ...i, quantity: remainingQty, formula: remainingQty.toString() } : i).concat(newItem);
       }
     });
@@ -842,9 +845,10 @@ export default function App() {
       const currentItem = prev.find(i => i.id === id);
       if (!currentItem) return prev;
       
+      const isFullPut = qty === currentItem.quantity;
       const newItem: ProcessItem = { 
         ...currentItem, 
-        id: `pi-${Date.now()}`, 
+        id: isFullPut ? currentItem.id : `pi-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, 
         section: 'completed' as ProcessSection, 
         quantity: qty,
         createdAt: today
@@ -853,10 +857,11 @@ export default function App() {
       const remainingQty = Math.max(0, currentItem.quantity - qty);
 
       if (remainingQty === 0) {
-        fetch(`/api/process-items/${id}`, { method: 'DELETE' }).catch(err => console.error(err));
-        return [...prev.filter(i => i.id !== id), newItem];
+        // 全量完成，直接更新該項目的 section
+        return prev.map(i => i.id === id ? newItem : i);
       } else {
-        return prev.map(i => i.id === id ? { ...i, quantity: remainingQty } : i).concat(newItem);
+        // 部分完成，保留原項目並新增一個新 ID 的項目
+        return prev.map(i => i.id === id ? { ...i, quantity: remainingQty, formula: remainingQty.toString() } : i).concat(newItem);
       }
     });
   };
