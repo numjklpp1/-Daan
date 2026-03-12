@@ -1,5 +1,6 @@
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { io } from 'socket.io-client';
 import { ViewType, InventoryItem, Order, Trip, OrderStatus, TripStatus, ProcessItem, ProcessSection, StackingItemStatus, VehicleProfile, DoorFrame, PartsSection, DoorFrameSection } from './types';
 import { Icons, getProductLabel } from './constants';
 import { calculateStacking } from './services/stackingLogic';
@@ -263,72 +264,125 @@ export default function App() {
   const [inventorySearch, setInventorySearch] = useState('');
   const [calendarDate, setCalendarDate] = useState(new Date());
 
+  // 定義資料獲取函數
+  const fetchInventory = useCallback(async () => {
+    try {
+      const res = await fetch('/api/inventory');
+      const data = await res.json();
+      if (data) setInventory(data);
+    } catch (error) {
+      console.error('Failed to fetch inventory:', error);
+    }
+  }, []);
+
+  const fetchProcessItems = useCallback(async () => {
+    try {
+      const res = await fetch('/api/process-items');
+      const data = await res.json();
+      if (data) {
+        const normalized = data.map((p: any) => ({
+          ...p,
+          isSyncedToParts: !!p.isSyncedToParts,
+          isPreparing: !!p.isPreparing
+        }));
+        setProcessItems(normalized);
+        
+        // 更新同步 ID 集合
+        const syncedIds = new Set<string>();
+        normalized.forEach((item: any) => {
+          if (item.section !== 'prep' || item.isSyncedToParts) {
+            syncedIds.add(item.id);
+          }
+        });
+        syncedProcessItemsRef.current = syncedIds;
+      }
+    } catch (error) {
+      console.error('Failed to fetch process items:', error);
+    }
+  }, []);
+
+  const fetchDoorFrames = useCallback(async () => {
+    try {
+      const res = await fetch('/api/door-frames');
+      const data = await res.json();
+      if (data) setDoorFrames(data);
+    } catch (error) {
+      console.error('Failed to fetch door frames:', error);
+    }
+  }, []);
+
+  const fetchOrders = useCallback(async () => {
+    try {
+      const res = await fetch('/api/orders');
+      const data = await res.json();
+      if (data && data.length > 0) setOrders(data);
+    } catch (error) {
+      console.error('Failed to fetch orders:', error);
+    }
+  }, []);
+
+  const fetchTrips = useCallback(async () => {
+    try {
+      const res = await fetch('/api/trips');
+      const data = await res.json();
+      if (data && data.length > 0) setTrips(data);
+    } catch (error) {
+      console.error('Failed to fetch trips:', error);
+    }
+  }, []);
+
+  // Socket.io 監聽器
+  useEffect(() => {
+    const socket = io();
+
+    socket.on('inventory_updated', () => {
+      console.log('Inventory updated remotely, re-fetching...');
+      fetchInventory();
+    });
+
+    socket.on('process_items_updated', () => {
+      console.log('Process items updated remotely, re-fetching...');
+      fetchProcessItems();
+    });
+
+    socket.on('door_frames_updated', () => {
+      console.log('Door frames updated remotely, re-fetching...');
+      fetchDoorFrames();
+    });
+
+    socket.on('orders_updated', () => {
+      console.log('Orders updated remotely, re-fetching...');
+      fetchOrders();
+    });
+
+    socket.on('trips_updated', () => {
+      console.log('Trips updated remotely, re-fetching...');
+      fetchTrips();
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [fetchInventory, fetchProcessItems, fetchDoorFrames, fetchOrders, fetchTrips]);
+
   // 從資料庫獲取庫存
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const [invRes, procRes, doorRes] = await Promise.all([
-          fetch('/api/inventory'),
-          fetch('/api/process-items'),
-          fetch('/api/door-frames')
+        await Promise.all([
+          fetchInventory(),
+          fetchProcessItems(),
+          fetchDoorFrames(),
+          fetchOrders(),
+          fetchTrips()
         ]);
-
-        const invData = await invRes.json();
-        const procData = await procRes.json();
-        const doorData = await doorRes.json();
-
-        if (invData && invData.length > 0) {
-          setInventory(invData);
-        } else {
-          await fetch('/api/inventory/sync', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ items: inventory })
-          });
-        }
-
-        if (procData && procData.length > 0) {
-          // 確保布林值正確
-          const normalizedProcData = procData.map((p: any) => ({
-            ...p,
-            isSyncedToParts: !!p.isSyncedToParts,
-            isPreparing: !!p.isPreparing
-          }));
-          setProcessItems(normalizedProcData);
-          
-          // 初始化已同步 ID 集合
-          const syncedIds = new Set<string>();
-          normalizedProcData.forEach((item: any) => {
-            if (item.section !== 'prep' || item.isSyncedToParts) {
-              syncedIds.add(item.id);
-            }
-          });
-          
-          // 從現有零件中恢復已同步的 ID
-          if (doorData && doorData.length > 0) {
-            doorData.forEach((df: any) => {
-              if (df.sourceProcessItemId) syncedIds.add(df.sourceProcessItemId);
-            });
-            setDoorFrames(doorData);
-          }
-          
-          syncedProcessItemsRef.current = syncedIds;
-        } else if (doorData && doorData.length > 0) {
-          setDoorFrames(doorData);
-          const syncedIds = new Set<string>();
-          doorData.forEach((df: any) => {
-            if (df.sourceProcessItemId) syncedIds.add(df.sourceProcessItemId);
-          });
-          syncedProcessItemsRef.current = syncedIds;
-        }
-
         isInitialLoadComplete.current = true;
       } catch (error) {
-        console.error('Failed to fetch data:', error);
+        console.error('Failed to fetch initial data:', error);
       }
     };
     fetchAll();
-  }, []);
+  }, [fetchInventory, fetchProcessItems, fetchDoorFrames, fetchOrders, fetchTrips]);
 
   // 同步流程管理到資料庫
   useEffect(() => {
@@ -365,6 +419,40 @@ export default function App() {
     };
     sync();
   }, [doorFrames]);
+
+  // 同步訂單管理到資料庫
+  useEffect(() => {
+    if (!isInitialLoadComplete.current) return;
+    const sync = async () => {
+      try {
+        await fetch('/api/orders/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: orders })
+        });
+      } catch (error) {
+        console.error('Failed to sync orders:', error);
+      }
+    };
+    sync();
+  }, [orders]);
+
+  // 同步車趟排程到資料庫
+  useEffect(() => {
+    if (!isInitialLoadComplete.current) return;
+    const sync = async () => {
+      try {
+        await fetch('/api/trips/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: trips })
+        });
+      } catch (error) {
+        console.error('Failed to sync trips:', error);
+      }
+    };
+    sync();
+  }, [trips]);
 
   // 零件堆疊邏輯：自動合併相同 SKU/名稱/分類/階段的項目
   useEffect(() => {

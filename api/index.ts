@@ -75,6 +75,30 @@ async function initDb() {
         d INTEGER
       );
     `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS orders (
+        id TEXT PRIMARY KEY,
+        order_number TEXT,
+        customer_name TEXT,
+        status TEXT,
+        items JSONB,
+        trip_id TEXT,
+        created_at TEXT,
+        region TEXT
+      );
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS trips (
+        id TEXT PRIMARY KEY,
+        trip_number TEXT,
+        driver_name TEXT,
+        vehicle_plate TEXT,
+        status TEXT,
+        date TEXT,
+        order_ids JSONB,
+        vehicle_id TEXT
+      );
+    `;
     console.log("Database initialized");
   } catch (error) {
     console.error("Failed to initialize database:", error);
@@ -162,6 +186,7 @@ app.post("/api/process-items/sync", async (req, res) => {
       `;
     }
     res.json({ success: true });
+    req.app.get("io")?.emit("process_items_updated");
   } catch (error) {
     res.status(500).json({ error: "Failed to sync process items" });
   }
@@ -171,6 +196,7 @@ app.delete("/api/process-items/:id", async (req, res) => {
   try {
     await sql`DELETE FROM process_items WHERE id = ${req.params.id}`;
     res.json({ success: true });
+    req.app.get("io")?.emit("process_items_updated");
   } catch (error) {
     res.status(500).json({ error: "Failed to delete process item" });
   }
@@ -235,6 +261,7 @@ app.post("/api/door-frames/sync", async (req, res) => {
       `;
     }
     res.json({ success: true });
+    req.app.get("io")?.emit("door_frames_updated");
   } catch (error) {
     res.status(500).json({ error: "Failed to sync door frames" });
   }
@@ -244,6 +271,7 @@ app.delete("/api/door-frames/:id", async (req, res) => {
   try {
     await sql`DELETE FROM door_frames WHERE id = ${req.params.id}`;
     res.json({ success: true });
+    req.app.get("io")?.emit("door_frames_updated");
   } catch (error) {
     res.status(500).json({ error: "Failed to delete door frame" });
   }
@@ -254,6 +282,7 @@ app.delete("/api/door-frames/source/:sourceId", async (req, res) => {
     // 僅刪除處於 'prep' (預備組) 階段的零件
     await sql`DELETE FROM door_frames WHERE source_process_item_id = ${req.params.sourceId} AND section = 'prep'`;
     res.json({ success: true });
+    req.app.get("io")?.emit("door_frames_updated");
   } catch (error) {
     res.status(500).json({ error: "Failed to delete door frames by source" });
   }
@@ -263,6 +292,7 @@ app.post("/api/door-frames/clear-prep", async (req, res) => {
   try {
     await sql`DELETE FROM door_frames WHERE section = 'prep'`;
     res.json({ success: true });
+    req.app.get("io")?.emit("door_frames_updated");
   } catch (error) {
     res.status(500).json({ error: "Failed to clear prep frames" });
   }
@@ -282,6 +312,7 @@ app.post("/api/inventory/sync", async (req, res) => {
       `;
     }
     res.json({ success: true });
+    req.app.get("io")?.emit("inventory_updated");
   } catch (error) {
     console.error("Sync error:", error);
     res.status(500).json({ error: "Failed to sync inventory" });
@@ -297,6 +328,7 @@ app.post("/api/inventory/update-stock", async (req, res) => {
       WHERE id = ${inventoryId}
     `;
     res.json({ success: true });
+    req.app.get("io")?.emit("inventory_updated");
   } catch (error) {
     res.status(500).json({ error: "Failed to update stock" });
   }
@@ -307,8 +339,96 @@ app.delete("/api/inventory/:id", async (req, res) => {
   try {
     await sql`DELETE FROM inventory WHERE id = ${id}`;
     res.json({ success: true });
+    req.app.get("io")?.emit("inventory_updated");
   } catch (error) {
     res.status(500).json({ error: "Failed to delete item" });
+  }
+});
+
+// Orders Routes
+app.get("/api/orders", async (req, res) => {
+  try {
+    const rows = await sql`SELECT * FROM orders`;
+    const orders = rows.map(row => ({
+      id: row.id,
+      orderNumber: row.order_number,
+      customerName: row.customer_name,
+      status: row.status,
+      items: row.items,
+      tripId: row.trip_id,
+      createdAt: row.created_at,
+      region: row.region
+    }));
+    res.json(orders);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch orders" });
+  }
+});
+
+app.post("/api/orders/sync", async (req, res) => {
+  const { items } = req.body;
+  try {
+    for (const item of items) {
+      await sql`
+        INSERT INTO orders (id, order_number, customer_name, status, items, trip_id, created_at, region)
+        VALUES (${item.id}, ${item.orderNumber}, ${item.customerName}, ${item.status}, ${JSON.stringify(item.items)}, ${item.tripId}, ${item.createdAt}, ${item.region})
+        ON CONFLICT (id) DO UPDATE SET
+          order_number = EXCLUDED.order_number,
+          customer_name = EXCLUDED.customer_name,
+          status = EXCLUDED.status,
+          items = EXCLUDED.items,
+          trip_id = EXCLUDED.trip_id,
+          region = EXCLUDED.region;
+      `;
+    }
+    res.json({ success: true });
+    req.app.get("io")?.emit("orders_updated");
+  } catch (error) {
+    res.status(500).json({ error: "Failed to sync orders" });
+  }
+});
+
+// Trips Routes
+app.get("/api/trips", async (req, res) => {
+  try {
+    const rows = await sql`SELECT * FROM trips`;
+    const trips = rows.map(row => ({
+      id: row.id,
+      tripNumber: row.trip_number,
+      driverName: row.driver_name,
+      vehiclePlate: row.vehicle_plate,
+      status: row.status,
+      date: row.date,
+      orderIds: row.order_ids,
+      vehicleId: row.vehicle_id
+    }));
+    res.json(trips);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch trips" });
+  }
+});
+
+app.post("/api/trips/sync", async (req, res) => {
+  const { items } = req.body;
+  try {
+    for (const item of items) {
+      await sql`
+        INSERT INTO trips (id, trip_number, driver_name, vehicle_plate, status, date, order_ids, vehicle_id)
+        VALUES (${item.id}, ${item.tripNumber}, ${item.driverName}, ${item.vehiclePlate}, ${item.status}, ${item.date}, ${JSON.stringify(item.orderIds)}, ${item.vehicleId})
+        ON CONFLICT (id) DO UPDATE SET
+          trip_number = EXCLUDED.trip_number,
+          driver_name = EXCLUDED.driver_name,
+          vehicle_plate = EXCLUDED.vehicle_plate,
+          status = EXCLUDED.status,
+          date = EXCLUDED.date,
+          order_ids = EXCLUDED.order_ids,
+          vehicle_id = EXCLUDED.vehicle_id;
+      `;
+    }
+    res.json({ success: true });
+    req.app.get("io")?.emit("trips_updated");
+  } catch (error) {
+    res.status(500).json({ error: "Failed to sync trips" });
   }
 });
 
