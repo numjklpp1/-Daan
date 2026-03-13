@@ -31,6 +31,7 @@ export interface ProcessItem {
   targetDate?: string; // 格式: YYYY-MM-DD
   isSyncedToParts?: boolean;
   sortOrder?: number;
+  updatedAt?: string;
 }
 
 export interface Company {
@@ -55,6 +56,7 @@ export interface InventoryItem {
     d: number;
   };
   weight: number;
+  updatedAt?: string;
 }
 
 export type DoorFrameSection = 'prep' | 'done' | 'stock';
@@ -81,6 +83,7 @@ export interface DoorFrame {
     d: number;
   };
   sortOrder?: number;
+  updatedAt?: string;
 }
 
 export interface OrderItem {
@@ -100,6 +103,7 @@ export interface Order {
   tripId?: string;
   createdAt: string;
   region?: string;
+  updatedAt?: string;
 }
 
 export interface VehicleProfile {
@@ -119,6 +123,7 @@ export interface Trip {
   date: string;
   orderIds: string[];
   vehicleId?: string;
+  updatedAt?: string;
 }
 
 export type ViewType = 'dashboard' | 'inventory' | 'orders' | 'trips' | 'stacking' | 'process' | 'parts';

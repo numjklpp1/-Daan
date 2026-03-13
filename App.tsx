@@ -696,7 +696,7 @@ export default function App() {
   const currentVolume = useMemo(() => tripOrders.reduce((acc, o) => acc + o.items.reduce((sum, i) => sum + (i.quantity * (inventory.find(inv => inv.id === i.inventoryId)?.volume || 0)), 0), 0), [tripOrders, inventory]);
 
   const handleUpdateStock = async (id: string, delta: number) => {
-    setInventory(prev => prev.map(i => i.id === id ? { ...i, quantity: Math.max(0, i.quantity + delta) } : i));
+    setInventory(prev => prev.map(i => i.id === id ? { ...i, quantity: Math.max(0, i.quantity + delta), updatedAt: new Date().toISOString() } : i));
     try {
       await fetch('/api/inventory/update-stock', {
         method: 'POST',
@@ -709,7 +709,7 @@ export default function App() {
   };
 
   const handleAddItem = async (item: Omit<InventoryItem, 'id'>) => {
-    const newItem = { ...item, id: `i${Date.now()}` };
+    const newItem = { ...item, id: `i${Date.now()}`, updatedAt: new Date().toISOString() };
     setInventory(prev => [...prev, newItem]);
     try {
       await fetch('/api/inventory/sync', {
@@ -723,12 +723,13 @@ export default function App() {
   };
 
   const handleUpdateItem = async (item: InventoryItem) => {
-    setInventory(prev => prev.map(i => i.id === item.id ? item : i));
+    const itemWithTime = { ...item, updatedAt: new Date().toISOString() };
+    setInventory(prev => prev.map(i => i.id === item.id ? itemWithTime : i));
     try {
       await fetch('/api/inventory/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: [item] })
+        body: JSON.stringify({ items: [itemWithTime] })
       });
     } catch (error) {
       console.error('Failed to update item on server:', error);
@@ -747,7 +748,17 @@ export default function App() {
   };
 
   const handleUpdateProcessItems = (update: ProcessItem[] | ((prev: ProcessItem[]) => ProcessItem[])) => {
-    setProcessItems(update);
+    setProcessItems(prev => {
+      const next = typeof update === 'function' ? update(prev) : update;
+      // 為所有改變的項目更新時間戳
+      return next.map(item => {
+        const oldItem = prev.find(p => p.id === item.id);
+        if (JSON.stringify(oldItem) !== JSON.stringify(item)) {
+          return { ...item, updatedAt: new Date().toISOString() };
+        }
+        return item;
+      });
+    });
   };
 
   const handleClearPrepFrames = async () => {
@@ -863,7 +874,8 @@ export default function App() {
         section: nextSection, 
         quantity: moveQty,
         formula: moveQty.toString(),
-        createdAt: (nextSection === 'completed' || nextSection === 'packaging') ? today : undefined
+        createdAt: (nextSection === 'completed' || nextSection === 'packaging') ? today : undefined,
+        updatedAt: new Date().toISOString()
       };
       
       const remainingQty = Math.max(0, item.quantity - moveQty);
@@ -873,7 +885,7 @@ export default function App() {
         return prev.map(i => i.id === id ? newItem : i);
       } else {
         // 部分轉移，保留原項目並新增一個新 ID 的項目
-        return prev.map(i => i.id === id ? { ...i, quantity: remainingQty, formula: remainingQty.toString() } : i).concat(newItem);
+        return prev.map(i => i.id === id ? { ...i, quantity: remainingQty, formula: remainingQty.toString(), updatedAt: new Date().toISOString() } : i).concat(newItem);
       }
     });
   };
@@ -934,7 +946,7 @@ export default function App() {
 
   const handleAddProcessItem = (item: Omit<ProcessItem, 'id'>) => {
     const id = `pi-${Date.now()}`;
-    const newItem = { ...item, id };
+    const newItem = { ...item, id, updatedAt: new Date().toISOString() };
     
     setProcessItems(prev => [...prev, newItem]);
 
@@ -990,7 +1002,8 @@ export default function App() {
         id: isFullPut ? currentItem.id : `pi-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, 
         section: 'completed' as ProcessSection, 
         quantity: qty,
-        createdAt: today
+        createdAt: today,
+        updatedAt: new Date().toISOString()
       };
       
       const remainingQty = Math.max(0, currentItem.quantity - qty);
@@ -1000,7 +1013,7 @@ export default function App() {
         return prev.map(i => i.id === id ? newItem : i);
       } else {
         // 部分完成，保留原項目並新增一個新 ID 的項目
-        return prev.map(i => i.id === id ? { ...i, quantity: remainingQty, formula: remainingQty.toString() } : i).concat(newItem);
+        return prev.map(i => i.id === id ? { ...i, quantity: remainingQty, formula: remainingQty.toString(), updatedAt: new Date().toISOString() } : i).concat(newItem);
       }
     });
   };
@@ -1059,7 +1072,8 @@ export default function App() {
         const existingItem = prev.find(i => i.sku === frame.sku && i.category === targetCategory);
         if (existingItem) {
           targetId = existingItem.id;
-          return prev.map(i => i.id === existingItem.id ? { ...i, quantity: i.quantity + qty } : i);
+          const updatedItem = { ...existingItem, quantity: existingItem.quantity + qty, updatedAt: new Date().toISOString() };
+          return prev.map(i => i.id === existingItem.id ? updatedItem : i);
         } else {
           const newId = `i-${Date.now()}`;
           targetId = newId;
@@ -1073,7 +1087,8 @@ export default function App() {
             attribute: frame.category === 'door' ? '加框' : '抽屜',
             dimensions: frame.dimensions,
             weight: 0,
-            volume: (frame.dimensions.h * frame.dimensions.w * frame.dimensions.d) / 1000000000
+            volume: (frame.dimensions.h * frame.dimensions.w * frame.dimensions.d) / 1000000000,
+            updatedAt: new Date().toISOString()
           };
           
           // 非同步同步到伺服器

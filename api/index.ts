@@ -32,7 +32,8 @@ async function initDb() {
         w INTEGER,
         d INTEGER,
         weight NUMERIC,
-        volume NUMERIC
+        volume NUMERIC,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `;
     await sql`
@@ -48,14 +49,9 @@ async function initDb() {
         created_at TEXT,
         target_date TEXT,
         is_synced_to_parts BOOLEAN DEFAULT FALSE,
-        sort_order INTEGER DEFAULT 0
+        sort_order INTEGER DEFAULT 0,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
-    `;
-    await sql`
-      ALTER TABLE process_items ADD COLUMN IF NOT EXISTS is_synced_to_parts BOOLEAN DEFAULT FALSE;
-    `;
-    await sql`
-      ALTER TABLE process_items ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
     `;
     await sql`
       CREATE TABLE IF NOT EXISTS door_frames (
@@ -77,11 +73,9 @@ async function initDb() {
         h INTEGER,
         w INTEGER,
         d INTEGER,
-        sort_order INTEGER DEFAULT 0
+        sort_order INTEGER DEFAULT 0,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
-    `;
-    await sql`
-      ALTER TABLE door_frames ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
     `;
     await sql`
       CREATE TABLE IF NOT EXISTS orders (
@@ -92,7 +86,8 @@ async function initDb() {
         items JSONB,
         trip_id TEXT,
         created_at TEXT,
-        region TEXT
+        region TEXT,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `;
     await sql`
@@ -104,9 +99,17 @@ async function initDb() {
         status TEXT,
         date TEXT,
         order_ids JSONB,
-        vehicle_id TEXT
+        vehicle_id TEXT,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `;
+
+    // Add updated_at columns if they don't exist
+    const tables = ['inventory', 'process_items', 'door_frames', 'orders', 'trips'];
+    for (const table of tables) {
+      await sql.unsafe(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP`);
+    }
+
     console.log("Database initialized");
   } catch (error) {
     console.error("Failed to initialize database:", error);
@@ -118,7 +121,7 @@ initDb();
 // API Routes
 app.get("/api/inventory", async (req, res) => {
   try {
-    const rows = await sql`SELECT * FROM inventory ORDER BY name ASC, id ASC`;
+    const rows = await sql`SELECT *, updated_at::text as updated_at_str FROM inventory ORDER BY name ASC, id ASC`;
     const inventory = rows.map(row => ({
       id: row.id,
       sku: row.sku,
@@ -129,7 +132,8 @@ app.get("/api/inventory", async (req, res) => {
       attribute: row.attribute,
       dimensions: { h: row.h, w: row.w, d: row.d },
       weight: Number(row.weight),
-      volume: Number(row.volume)
+      volume: Number(row.volume),
+      updatedAt: row.updated_at_str
     }));
     res.json(inventory);
   } catch (error) {
@@ -139,7 +143,7 @@ app.get("/api/inventory", async (req, res) => {
 
 app.get("/api/process-items", async (req, res) => {
   try {
-    const rows = await sql`SELECT * FROM process_items ORDER BY sort_order ASC, created_at ASC, id ASC`;
+    const rows = await sql`SELECT *, updated_at::text as updated_at_str FROM process_items ORDER BY sort_order ASC, created_at ASC, id ASC`;
     const items = rows.map(row => ({
       id: row.id,
       inventoryId: row.inventory_id,
@@ -152,7 +156,8 @@ app.get("/api/process-items", async (req, res) => {
       createdAt: row.created_at,
       targetDate: row.target_date,
       isSyncedToParts: !!row.is_synced_to_parts,
-      sortOrder: row.sort_order
+      sortOrder: row.sort_order,
+      updatedAt: row.updated_at_str
     }));
     res.json(items);
   } catch (error) {
@@ -164,14 +169,13 @@ app.post("/api/process-items/sync", async (req, res) => {
   const { items } = req.body;
   try {
     if (items && items.length > 0) {
-      const ids = items.map((item: any) => item.id);
-      // Delete items not in the sync list
-      await sql`DELETE FROM process_items WHERE id NOT IN (${ids.join(',')})`;
-      
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
+        // Use a timestamp from the client if provided, otherwise use current_timestamp
+        const updatedAt = item.updatedAt ? item.updatedAt : new Date().toISOString();
+        
         await sql`
-          INSERT INTO process_items (id, inventory_id, name, quantity, section, note, formula, is_preparing, created_at, target_date, is_synced_to_parts, sort_order)
+          INSERT INTO process_items (id, inventory_id, name, quantity, section, note, formula, is_preparing, created_at, target_date, is_synced_to_parts, sort_order, updated_at)
           VALUES (
             ${item.id}, 
             ${item.inventoryId}, 
@@ -184,7 +188,8 @@ app.post("/api/process-items/sync", async (req, res) => {
             ${item.createdAt}, 
             ${item.targetDate}, 
             ${item.isSyncedToParts ? 1 : 0},
-            ${i}
+            ${item.sortOrder || i},
+            ${updatedAt}
           )
           ON CONFLICT (id) DO UPDATE SET
             inventory_id = EXCLUDED.inventory_id,
@@ -197,12 +202,11 @@ app.post("/api/process-items/sync", async (req, res) => {
             created_at = EXCLUDED.created_at,
             target_date = EXCLUDED.target_date,
             is_synced_to_parts = EXCLUDED.is_synced_to_parts,
-            sort_order = EXCLUDED.sort_order;
+            sort_order = EXCLUDED.sort_order,
+            updated_at = EXCLUDED.updated_at
+          WHERE EXCLUDED.updated_at >= process_items.updated_at;
         `;
       }
-    } else {
-      // If items is empty, clear the table
-      await sql`DELETE FROM process_items`;
     }
     res.json({ success: true });
     req.app.get("io")?.emit("process_items_updated");
@@ -224,7 +228,7 @@ app.delete("/api/process-items/:id", async (req, res) => {
 
 app.get("/api/door-frames", async (req, res) => {
   try {
-    const rows = await sql`SELECT * FROM door_frames ORDER BY sort_order ASC, created_at ASC, id ASC`;
+    const rows = await sql`SELECT *, updated_at::text as updated_at_str FROM door_frames ORDER BY sort_order ASC, created_at ASC, id ASC`;
     const items = rows.map(row => ({
       id: row.id,
       sku: row.sku,
@@ -242,7 +246,8 @@ app.get("/api/door-frames", async (req, res) => {
       targetDate: row.target_date,
       sourceProcessItemId: row.source_process_item_id,
       dimensions: { h: row.h, w: row.w, d: row.d },
-      sortOrder: row.sort_order
+      sortOrder: row.sort_order,
+      updatedAt: row.updated_at_str
     }));
     res.json(items);
   } catch (error) {
@@ -254,18 +259,18 @@ app.post("/api/door-frames/sync", async (req, res) => {
   const { items } = req.body;
   try {
     if (items && items.length > 0) {
-      const ids = items.map((item: any) => item.id);
-      await sql`DELETE FROM door_frames WHERE id NOT IN (${ids.join(',')})`;
-      
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
+        const updatedAt = item.updatedAt ? item.updatedAt : new Date().toISOString();
+        
         await sql`
-          INSERT INTO door_frames (id, sku, name, category, section, material, direction, color, quantity, note, formula, is_preparing, created_at, target_date, source_process_item_id, h, w, d, sort_order)
+          INSERT INTO door_frames (id, sku, name, category, section, material, direction, color, quantity, note, formula, is_preparing, created_at, target_date, source_process_item_id, h, w, d, sort_order, updated_at)
           VALUES (
             ${item.id}, ${item.sku}, ${item.name}, ${item.category}, ${item.section}, ${item.material}, ${item.direction}, ${item.color}, ${item.quantity}, ${item.note}, ${item.formula}, 
             ${item.isPreparing ? 1 : 0}, 
             ${item.createdAt}, ${item.targetDate}, ${item.sourceProcessItemId}, ${item.dimensions.h}, ${item.dimensions.w}, ${item.dimensions.d},
-            ${i}
+            ${item.sortOrder || i},
+            ${updatedAt}
           )
           ON CONFLICT (id) DO UPDATE SET
             sku = EXCLUDED.sku,
@@ -285,11 +290,11 @@ app.post("/api/door-frames/sync", async (req, res) => {
             h = EXCLUDED.h,
             w = EXCLUDED.w,
             d = EXCLUDED.d,
-            sort_order = EXCLUDED.sort_order;
+            sort_order = EXCLUDED.sort_order,
+            updated_at = EXCLUDED.updated_at
+          WHERE EXCLUDED.updated_at >= door_frames.updated_at;
         `;
       }
-    } else {
-      await sql`DELETE FROM door_frames`;
     }
     res.json({ success: true });
     req.app.get("io")?.emit("door_frames_updated");
@@ -334,13 +339,16 @@ app.post("/api/inventory/sync", async (req, res) => {
   const { items } = req.body;
   try {
     for (const item of items) {
+      const updatedAt = item.updatedAt ? item.updatedAt : new Date().toISOString();
       await sql`
-        INSERT INTO inventory (id, sku, name, quantity, unit, category, attribute, h, w, d, weight, volume)
-        VALUES (${item.id}, ${item.sku}, ${item.name}, ${item.quantity}, ${item.unit}, ${item.category}, ${item.attribute}, ${item.dimensions.h}, ${item.dimensions.w}, ${item.dimensions.d}, ${item.weight}, ${item.volume})
+        INSERT INTO inventory (id, sku, name, quantity, unit, category, attribute, h, w, d, weight, volume, updated_at)
+        VALUES (${item.id}, ${item.sku}, ${item.name}, ${item.quantity}, ${item.unit}, ${item.category}, ${item.attribute}, ${item.dimensions.h}, ${item.dimensions.w}, ${item.dimensions.d}, ${item.weight}, ${item.volume}, ${updatedAt})
         ON CONFLICT (id) DO UPDATE SET
           quantity = EXCLUDED.quantity,
           attribute = EXCLUDED.attribute,
-          category = EXCLUDED.category;
+          category = EXCLUDED.category,
+          updated_at = EXCLUDED.updated_at
+        WHERE EXCLUDED.updated_at >= inventory.updated_at;
       `;
     }
     res.json({ success: true });
@@ -356,7 +364,8 @@ app.post("/api/inventory/update-stock", async (req, res) => {
   try {
     await sql`
       UPDATE inventory 
-      SET quantity = quantity + ${quantityChange}
+      SET quantity = quantity + ${quantityChange},
+          updated_at = CURRENT_TIMESTAMP
       WHERE id = ${inventoryId}
     `;
     res.json({ success: true });
@@ -380,7 +389,7 @@ app.delete("/api/inventory/:id", async (req, res) => {
 // Orders Routes
 app.get("/api/orders", async (req, res) => {
   try {
-    const rows = await sql`SELECT * FROM orders ORDER BY created_at ASC, id ASC`;
+    const rows = await sql`SELECT *, updated_at::text as updated_at_str FROM orders ORDER BY created_at ASC, id ASC`;
     const orders = rows.map(row => ({
       id: row.id,
       orderNumber: row.order_number,
@@ -389,7 +398,8 @@ app.get("/api/orders", async (req, res) => {
       items: row.items,
       tripId: row.trip_id,
       createdAt: row.created_at,
-      region: row.region
+      region: row.region,
+      updatedAt: row.updated_at_str
     }));
     res.json(orders);
   } catch (error) {
@@ -401,24 +411,22 @@ app.post("/api/orders/sync", async (req, res) => {
   const { items } = req.body;
   try {
     if (items && items.length > 0) {
-      const ids = items.map((item: any) => item.id);
-      await sql`DELETE FROM orders WHERE id NOT IN (${ids.join(',')})`;
-      
       for (const item of items) {
+        const updatedAt = item.updatedAt ? item.updatedAt : new Date().toISOString();
         await sql`
-          INSERT INTO orders (id, order_number, customer_name, status, items, trip_id, created_at, region)
-          VALUES (${item.id}, ${item.orderNumber}, ${item.customerName}, ${item.status}, ${JSON.stringify(item.items)}, ${item.tripId}, ${item.createdAt}, ${item.region})
+          INSERT INTO orders (id, order_number, customer_name, status, items, trip_id, created_at, region, updated_at)
+          VALUES (${item.id}, ${item.orderNumber}, ${item.customerName}, ${item.status}, ${JSON.stringify(item.items)}, ${item.tripId}, ${item.createdAt}, ${item.region}, ${updatedAt})
           ON CONFLICT (id) DO UPDATE SET
             order_number = EXCLUDED.order_number,
             customer_name = EXCLUDED.customer_name,
             status = EXCLUDED.status,
             items = EXCLUDED.items,
             trip_id = EXCLUDED.trip_id,
-            region = EXCLUDED.region;
+            region = EXCLUDED.region,
+            updated_at = EXCLUDED.updated_at
+          WHERE EXCLUDED.updated_at >= orders.updated_at;
         `;
       }
-    } else {
-      await sql`DELETE FROM orders`;
     }
     res.json({ success: true });
     req.app.get("io")?.emit("orders_updated");
@@ -427,10 +435,20 @@ app.post("/api/orders/sync", async (req, res) => {
   }
 });
 
+app.delete("/api/orders/:id", async (req, res) => {
+  try {
+    await sql`DELETE FROM orders WHERE id = ${req.params.id}`;
+    res.json({ success: true });
+    req.app.get("io")?.emit("orders_updated");
+  } catch (error) {
+    res.status(500).json({ error: "Failed to delete order" });
+  }
+});
+
 // Trips Routes
 app.get("/api/trips", async (req, res) => {
   try {
-    const rows = await sql`SELECT * FROM trips ORDER BY date ASC, id ASC`;
+    const rows = await sql`SELECT *, updated_at::text as updated_at_str FROM trips ORDER BY date ASC, id ASC`;
     const trips = rows.map(row => ({
       id: row.id,
       tripNumber: row.trip_number,
@@ -439,7 +457,8 @@ app.get("/api/trips", async (req, res) => {
       status: row.status,
       date: row.date,
       orderIds: row.order_ids,
-      vehicleId: row.vehicle_id
+      vehicleId: row.vehicle_id,
+      updatedAt: row.updated_at_str
     }));
     res.json(trips);
   } catch (error) {
@@ -451,13 +470,11 @@ app.post("/api/trips/sync", async (req, res) => {
   const { items } = req.body;
   try {
     if (items && items.length > 0) {
-      const ids = items.map((item: any) => item.id);
-      await sql`DELETE FROM trips WHERE id NOT IN (${ids.join(',')})`;
-      
       for (const item of items) {
+        const updatedAt = item.updatedAt ? item.updatedAt : new Date().toISOString();
         await sql`
-          INSERT INTO trips (id, trip_number, driver_name, vehicle_plate, status, date, order_ids, vehicle_id)
-          VALUES (${item.id}, ${item.tripNumber}, ${item.driverName}, ${item.vehiclePlate}, ${item.status}, ${item.date}, ${JSON.stringify(item.orderIds)}, ${item.vehicleId})
+          INSERT INTO trips (id, trip_number, driver_name, vehicle_plate, status, date, order_ids, vehicle_id, updated_at)
+          VALUES (${item.id}, ${item.tripNumber}, ${item.driverName}, ${item.vehiclePlate}, ${item.status}, ${item.date}, ${JSON.stringify(item.orderIds)}, ${item.vehicleId}, ${updatedAt})
           ON CONFLICT (id) DO UPDATE SET
             trip_number = EXCLUDED.trip_number,
             driver_name = EXCLUDED.driver_name,
@@ -465,16 +482,26 @@ app.post("/api/trips/sync", async (req, res) => {
             status = EXCLUDED.status,
             date = EXCLUDED.date,
             order_ids = EXCLUDED.order_ids,
-            vehicle_id = EXCLUDED.vehicle_id;
+            vehicle_id = EXCLUDED.vehicle_id,
+            updated_at = EXCLUDED.updated_at
+          WHERE EXCLUDED.updated_at >= trips.updated_at;
         `;
       }
-    } else {
-      await sql`DELETE FROM trips`;
     }
     res.json({ success: true });
     req.app.get("io")?.emit("trips_updated");
   } catch (error) {
     res.status(500).json({ error: "Failed to sync trips" });
+  }
+});
+
+app.delete("/api/trips/:id", async (req, res) => {
+  try {
+    await sql`DELETE FROM trips WHERE id = ${req.params.id}`;
+    res.json({ success: true });
+    req.app.get("io")?.emit("trips_updated");
+  } catch (error) {
+    res.status(500).json({ error: "Failed to delete trip" });
   }
 });
 
