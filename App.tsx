@@ -14,7 +14,21 @@ import { OrdersView } from './components/OrdersView';
 import { InventoryView } from './components/InventoryView';
 import { DoorFrameView } from './components/DoorFrameView';
 
-const MenuDrawer = ({ activeView, onViewChange, processSubView, setProcessSubView, partsSubView, setPartsSubView, inventorySubView, setInventorySubView, isMenuOpen, onToggleMenu }: any) => {
+const MenuDrawer = ({ 
+  activeView, 
+  onViewChange, 
+  processSubView, 
+  setProcessSubView, 
+  partsSubView, 
+  setPartsSubView, 
+  inventorySubView, 
+  setInventorySubView, 
+  isMenuOpen, 
+  onToggleMenu,
+  isConnected,
+  lastSyncTime,
+  onRefresh
+}: any) => {
   const menuItems = [
     { id: 'dashboard', label: '總覽儀表板', icon: <Icons.Dashboard /> },
     { id: 'process', label: '流程管理', icon: <Icons.Stacking />, hasSub: true },
@@ -34,12 +48,35 @@ const MenuDrawer = ({ activeView, onViewChange, processSubView, setProcessSubVie
       
       {/* Drawer Content */}
       <div className="relative w-72 bg-slate-950 border-r border-slate-800 h-full shadow-2xl animate-in slide-in-from-left duration-300 p-6 flex flex-col">
-        <div className="mb-12 flex items-center gap-4">
+        <div className="mb-8 flex items-center gap-4">
           <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center font-black text-2xl shadow-lg shadow-blue-600/20">昌</div>
           <div>
             <h1 className="text-xl font-bold tracking-tight text-white">昌儲 TripFlow</h1>
             <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">系統導航選單</p>
           </div>
+        </div>
+
+        {/* Connection Status */}
+        <div className="mb-6 p-4 bg-slate-900/50 border border-slate-800 rounded-2xl">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">連線狀態</span>
+            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'}`}></div>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-300">{isConnected ? '已連線' : '連線中...'}</span>
+            <button 
+              onClick={onRefresh}
+              className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 transition-colors"
+              title="手動同步"
+            >
+              <Icons.Refresh className="w-3 h-3" />
+            </button>
+          </div>
+          {lastSyncTime && (
+            <p className="text-[9px] text-slate-600 font-bold mt-2">
+              最後同步: {lastSyncTime.toLocaleTimeString()}
+            </p>
+          )}
         </div>
         
         <nav className="space-y-2 flex-1 overflow-y-auto scrollbar-hide">
@@ -344,6 +381,8 @@ export default function App() {
   }, [processItems]);
   const syncedProcessItemsRef = useRef<Set<string>>(new Set());
   const isInitialLoadComplete = useRef(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
 
   // 用於防止無限同步迴圈的 Ref
   const lastProcessItemsJson = useRef<string>('');
@@ -460,31 +499,50 @@ export default function App() {
 
   // Socket.io 監聽器
   useEffect(() => {
-    const socket = io();
+    const socket = io({
+      transports: ['websocket', 'polling'],
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+    });
+
+    socket.on('connect', () => {
+      console.log('Socket connected:', socket.id);
+      setIsConnected(true);
+    });
+
+    socket.on('disconnect', () => {
+      console.log('Socket disconnected');
+      setIsConnected(false);
+    });
 
     socket.on('inventory_updated', () => {
       console.log('Inventory updated remotely, re-fetching...');
       fetchInventory();
+      setLastSyncTime(new Date());
     });
 
     socket.on('process_items_updated', () => {
       console.log('Process items updated remotely, re-fetching...');
       fetchProcessItems();
+      setLastSyncTime(new Date());
     });
 
     socket.on('door_frames_updated', () => {
       console.log('Door frames updated remotely, re-fetching...');
       fetchDoorFrames();
+      setLastSyncTime(new Date());
     });
 
     socket.on('orders_updated', () => {
       console.log('Orders updated remotely, re-fetching...');
       fetchOrders();
+      setLastSyncTime(new Date());
     });
 
     socket.on('trips_updated', () => {
       console.log('Trips updated remotely, re-fetching...');
       fetchTrips();
+      setLastSyncTime(new Date());
     });
 
     return () => {
@@ -493,23 +551,27 @@ export default function App() {
   }, [fetchInventory, fetchProcessItems, fetchDoorFrames, fetchOrders, fetchTrips]);
 
   // 從資料庫獲取庫存
-  useEffect(() => {
-    const fetchAll = async () => {
-      try {
-        await Promise.all([
-          fetchInventory(),
-          fetchProcessItems(),
-          fetchDoorFrames(),
-          fetchOrders(),
-          fetchTrips()
-        ]);
-        isInitialLoadComplete.current = true;
-      } catch (error) {
-        console.error('Failed to fetch initial data:', error);
-      }
-    };
-    fetchAll();
+  const fetchAllData = useCallback(async () => {
+    try {
+      // 改用 individual await 以確保即使部分失敗，其他部分也能載入
+      await fetchInventory().catch(e => console.error('Init inventory failed:', e));
+      await fetchProcessItems().catch(e => console.error('Init process items failed:', e));
+      await fetchDoorFrames().catch(e => console.error('Init door frames failed:', e));
+      await fetchOrders().catch(e => console.error('Init orders failed:', e));
+      await fetchTrips().catch(e => console.error('Init trips failed:', e));
+      
+      isInitialLoadComplete.current = true;
+      setLastSyncTime(new Date());
+    } catch (error) {
+      console.error('Failed to fetch initial data:', error);
+      // 即使失敗也標記為完成，以便後續同步能運作
+      isInitialLoadComplete.current = true;
+    }
   }, [fetchInventory, fetchProcessItems, fetchDoorFrames, fetchOrders, fetchTrips]);
+
+  useEffect(() => {
+    fetchAllData();
+  }, [fetchAllData]);
 
   // 同步流程管理到資料庫
   useEffect(() => {
@@ -1244,6 +1306,18 @@ export default function App() {
     });
   };
 
+  const handleManualRefresh = async () => {
+    const toast = document.createElement('div');
+    toast.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 bg-blue-600 text-white px-6 py-3 rounded-2xl font-bold shadow-2xl z-[200] animate-in fade-in slide-in-from-bottom-4';
+    toast.innerText = '正在同步最新資料...';
+    document.body.appendChild(toast);
+    
+    await fetchAllData();
+    
+    toast.innerText = '同步完成';
+    setTimeout(() => toast.remove(), 2000);
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200">
       <MenuDrawer 
@@ -1257,6 +1331,9 @@ export default function App() {
         setInventorySubView={setInventorySubView}
         isMenuOpen={isMenuOpen}
         onToggleMenu={() => setIsMenuOpen(!isMenuOpen)}
+        isConnected={isConnected}
+        lastSyncTime={lastSyncTime}
+        onRefresh={handleManualRefresh}
       />
       
       <div className="min-h-screen flex flex-col bg-black">
