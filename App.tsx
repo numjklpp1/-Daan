@@ -83,6 +83,19 @@ const MenuDrawer = ({ activeView, onViewChange, processSubView, setProcessSubVie
 
               {item.id === 'parts' && activeView === 'parts' && (
                 <div className="mt-2 ml-6 border-l-2 border-slate-800 pl-6 space-y-4 py-2">
+                  {/* All Parts Branch */}
+                  <button
+                    onClick={() => {
+                      setPartsSubView('all-all');
+                      onToggleMenu();
+                    }}
+                    className={`w-full text-left px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+                      partsSubView === 'all-all' ? 'text-blue-400 bg-blue-400/10' : 'text-slate-500 hover:text-white'
+                    }`}
+                  >
+                    • 全部零件顯示
+                  </button>
+
                   {/* Door Frame Branch */}
                   <div>
                     <p className="text-[10px] text-slate-600 font-black uppercase tracking-widest mb-2 ml-2">門框</p>
@@ -185,80 +198,154 @@ export default function App() {
   const [partsSubView, setPartsSubView] = useState<PartsSection>('door-all');
   const [inventorySubView, setInventorySubView] = useState<'cabinet' | 'door'>('cabinet');
   
-  const [inventory, setInventory] = useState<InventoryItem[]>([
-    // 理想櫃
-    ...['138(F把)', '138', 'UC2(70.5)', 'UC2', 'UC3', 'UD2(70.5)', 'UD2(F把)', 'UD2', 'UD3(F把)', 'UD3', 'UD3A', 'UD3A(70.5)', 'UD4', 'UD4A', 'UD4B', 'UD6', 'UG2A', 'UG3A', 'UN2', 'UN3', 'UP2', 'UP3', 'US2(70.5)', 'US2', 'US3'].map(name => ({
-      id: `i-${name}`,
-      sku: name,
-      name: name,
-      quantity: 0,
-      unit: '個',
-      category: '理想櫃',
-      attribute: getProductLabel(name) as any,
-      dimensions: { h: 0, w: 0, d: 0 },
-      weight: 0,
-      volume: 0
-    })),
-    // 牆櫃
-    ...['AC2(70.5)', 'AC2', 'AC3', 'AD2(70.5)', 'AD2', 'AD3', 'AD3A', 'AD3A(70.5)', 'AD4', 'AD4B', 'AD6', 'AK2B', 'AK2U', 'AK3B', 'AK3U', 'AN1U', 'AO1H', 'AO1U', 'AO2B', 'AO2U', 'AO3B', 'AO3U', 'AO4B', 'AO4B2', 'AO5S', 'AS1H', 'AS1U', 'AS2B', 'AS2B(70.5)', 'AS2U', 'AS3B', 'AS3U'].map(name => ({
-      id: `i-${name}`,
-      sku: name,
-      name: name,
-      quantity: 0,
-      unit: '個',
-      category: '牆櫃',
-      attribute: getProductLabel(name) as any,
-      dimensions: { h: 0, w: 0, d: 0 },
-      weight: 0,
-      volume: 0
-    })),
-    // 其他鐵櫃
-    ...['訂做', 'CB2(70.5)', 'CB2', 'CB3', 'CB4', 'CT2(70.5)', 'CT2', 'CT3', 'CT4', 'DU11809M', 'DU118G', 'DU118M', 'DU8809M', 'DU88G', 'DU88M', 'KG118', 'KG88', 'KS118', 'KS88', 'R3M106', 'R3M180', '3M2T', 'R3M74', 'R3M90', '3M3T', '6M2T', '6M4T', '4M106G', 'R4M106', '4M106S', '4M2T', '4M74G', 'R4M74', '4M74S', 'R4M90', '4M3T', 'TaMh', 'TaS', 'TaL2T', 'TaL3T', 'TaMs'].map(name => ({
-      id: `i-${name}`,
-      sku: name,
-      name: name,
-      quantity: 0,
-      unit: '個',
-      category: '其他鐵櫃',
-      attribute: getProductLabel(name) as any,
-      dimensions: { h: 0, w: 0, d: 0 },
-      weight: 0,
-      volume: 0
-    })),
-    // 門框 (零件庫存)
-    ...['UG2A', 'UG3A', 'AK2B', 'AK2U', 'AK3B', 'AK3U', 'DU118G', 'DU88G', 'KG118', 'KG88', '4M106G', '4M74G'].map(name => ({
-      id: `i-df-${name}`,
-      sku: name,
-      name: name,
-      quantity: 0,
-      unit: '個',
-      category: '門框',
-      attribute: '加框' as any,
-      dimensions: { h: 0, w: 0, d: 0 },
-      weight: 0,
-      volume: 0
-    }))
-  ]);
+  const [inventory, setInventory] = useState<InventoryItem[]>(() => {
+    const saved = localStorage.getItem('tripflow_inventory');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse saved inventory', e);
+      }
+    }
+    return [
+      // 理想櫃
+      ...['138(F把)', '138', 'UC2(70.5)', 'UC2', 'UC3', 'UD2(70.5)', 'UD2(F把)', 'UD2', 'UD3(F把)', 'UD3', 'UD3A', 'UD3A(70.5)', 'UD4', 'UD4A', 'UD4B', 'UD6', 'UG2A', 'UG3A', 'UN2', 'UN3', 'UP2', 'UP3', 'US2(70.5)', 'US2', 'US3'].map(name => ({
+        id: `i-${name}`,
+        sku: name,
+        name: name,
+        quantity: 0,
+        unit: '個',
+        category: '理想櫃',
+        attribute: getProductLabel(name) as any,
+        dimensions: { h: 0, w: 0, d: 0 },
+        weight: 0,
+        volume: 0
+      })),
+      // 牆櫃
+      ...['AC2(70.5)', 'AC2', 'AC3', 'AD2(70.5)', 'AD2', 'AD3', 'AD3A', 'AD3A(70.5)', 'AD4', 'AD4B', 'AD6', 'AK2B', 'AK2U', 'AK3B', 'AK3U', 'AN1U', 'AO1H', 'AO1U', 'AO2B', 'AO2U', 'AO3B', 'AO3U', 'AO4B', 'AO4B2', 'AO5S', 'AS1H', 'AS1U', 'AS2B', 'AS2B(70.5)', 'AS2U', 'AS3B', 'AS3U'].map(name => ({
+        id: `i-${name}`,
+        sku: name,
+        name: name,
+        quantity: 0,
+        unit: '個',
+        category: '牆櫃',
+        attribute: getProductLabel(name) as any,
+        dimensions: { h: 0, w: 0, d: 0 },
+        weight: 0,
+        volume: 0
+      })),
+      // 其他鐵櫃
+      ...['訂做', 'CB2(70.5)', 'CB2', 'CB3', 'CB4', 'CT2(70.5)', 'CT2', 'CT3', 'CT4', 'DU11809M', 'DU118G', 'DU118M', 'DU8809M', 'DU88G', 'DU88M', 'KG118', 'KG88', 'KS118', 'KS88', 'R3M106', 'R3M180', '3M2T', 'R3M74', 'R3M90', '3M3T', '6M2T', '6M4T', '4M106G', 'R4M106', '4M106S', '4M2T', '4M74G', 'R4M74', '4M74S', 'R4M90', '4M3T', 'TaMh', 'TaS', 'TaL2T', 'TaL3T', 'TaMs'].map(name => ({
+        id: `i-${name}`,
+        sku: name,
+        name: name,
+        quantity: 0,
+        unit: '個',
+        category: '其他鐵櫃',
+        attribute: getProductLabel(name) as any,
+        dimensions: { h: 0, w: 0, d: 0 },
+        weight: 0,
+        volume: 0
+      })),
+      // 門框 (零件庫存)
+      ...['UG2A', 'UG3A', 'AK2B', 'AK2U', 'AK3B', 'AK3U', 'DU118G', 'DU88G', 'KG118', 'KG88', '4M106G', '4M74G'].map(name => ({
+        id: `i-df-${name}`,
+        sku: name,
+        name: name,
+        quantity: 0,
+        unit: '個',
+        category: '門框',
+        attribute: '加框' as any,
+        dimensions: { h: 0, w: 0, d: 0 },
+        weight: 0,
+        volume: 0
+      }))
+    ];
+  });
 
-  const [doorFrames, setDoorFrames] = useState<DoorFrame[]>([]);
+  const [doorFrames, setDoorFrames] = useState<DoorFrame[]>(() => {
+    const saved = localStorage.getItem('tripflow_doorFrames');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse saved doorFrames', e);
+      }
+    }
+    return [];
+  });
   const doorFramesRef = useRef<DoorFrame[]>([]);
   
   useEffect(() => {
     doorFramesRef.current = doorFrames;
+    localStorage.setItem('tripflow_doorFrames', JSON.stringify(doorFrames));
   }, [doorFrames]);
 
-  const [orders, setOrders] = useState<Order[]>([
-    { id: 'o1', orderNumber: 'ORD-2025-001', customerName: '台積中心', status: OrderStatus.PENDING, items: [{ id: 'oi1', inventoryId: 'i1', name: 'US2 桶身', quantity: 30, stackingStatus: '標準' }], createdAt: '2025-05-19', region: '新竹' },
-    { id: 'o2', orderNumber: 'ORD-2025-002', customerName: '聯發大樓', status: OrderStatus.PENDING, items: [{ id: 'oi2', inventoryId: 'i2', name: 'AO4B 側板', quantity: 20, stackingStatus: '標準' }], createdAt: '2025-05-20', region: '新竹' },
-  ]);
+  useEffect(() => {
+    localStorage.setItem('tripflow_inventory', JSON.stringify(inventory));
+  }, [inventory]);
 
-  const [trips, setTrips] = useState<Trip[]>([
-    { id: 't1', tripNumber: 'TRP-001', driverName: '阿豪', status: TripStatus.SCHEDULED, date: '2025-05-20', orderIds: ['o1'], vehicleId: 'v1' }
-  ]);
+  const [orders, setOrders] = useState<Order[]>(() => {
+    const saved = localStorage.getItem('tripflow_orders');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse saved orders', e);
+      }
+    }
+    return [
+      { id: 'o1', orderNumber: 'ORD-2025-001', customerName: '台積中心', status: OrderStatus.PENDING, items: [{ id: 'oi1', inventoryId: 'i1', name: 'US2 桶身', quantity: 30, stackingStatus: '標準' }], createdAt: '2025-05-19', region: '新竹' },
+      { id: 'o2', orderNumber: 'ORD-2025-002', customerName: '聯發大樓', status: OrderStatus.PENDING, items: [{ id: 'oi2', inventoryId: 'i2', name: 'AO4B 側板', quantity: 20, stackingStatus: '標準' }], createdAt: '2025-05-20', region: '新竹' },
+    ];
+  });
 
-  const [processItems, setProcessItems] = useState<ProcessItem[]>([]);
+  useEffect(() => {
+    localStorage.setItem('tripflow_orders', JSON.stringify(orders));
+  }, [orders]);
+
+  const [trips, setTrips] = useState<Trip[]>(() => {
+    const saved = localStorage.getItem('tripflow_trips');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse saved trips', e);
+      }
+    }
+    return [
+      { id: 't1', tripNumber: 'TRP-001', driverName: '阿豪', status: TripStatus.SCHEDULED, date: '2025-05-20', orderIds: ['o1'], vehicleId: 'v1' }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('tripflow_trips', JSON.stringify(trips));
+  }, [trips]);
+
+  const [processItems, setProcessItems] = useState<ProcessItem[]>(() => {
+    const saved = localStorage.getItem('tripflow_processItems');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Failed to parse saved processItems', e);
+      }
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('tripflow_processItems', JSON.stringify(processItems));
+  }, [processItems]);
   const syncedProcessItemsRef = useRef<Set<string>>(new Set());
   const isInitialLoadComplete = useRef(false);
+
+  // 用於防止無限同步迴圈的 Ref
+  const lastProcessItemsJson = useRef<string>('');
+  const lastDoorFramesJson = useRef<string>('');
+  const lastOrdersJson = useRef<string>('');
+  const lastTripsJson = useRef<string>('');
+  const syncTimeoutRef = useRef<Record<string, NodeJS.Timeout>>({});
 
   const [selectedTripId, setSelectedTripId] = useState<string | null>('t1');
   const [inventorySearch, setInventorySearch] = useState('');
@@ -285,7 +372,12 @@ export default function App() {
           isSyncedToParts: !!p.isSyncedToParts,
           isPreparing: !!p.isPreparing
         }));
-        setProcessItems(normalized);
+        
+        const json = JSON.stringify(normalized);
+        if (json !== lastProcessItemsJson.current) {
+          lastProcessItemsJson.current = json;
+          setProcessItems(normalized);
+        }
         
         // 更新同步 ID 集合
         const syncedIds = new Set<string>();
@@ -305,7 +397,13 @@ export default function App() {
     try {
       const res = await fetch('/api/door-frames');
       const data = await res.json();
-      if (data) setDoorFrames(data);
+      if (data) {
+        const json = JSON.stringify(data);
+        if (json !== lastDoorFramesJson.current) {
+          lastDoorFramesJson.current = json;
+          setDoorFrames(data);
+        }
+      }
     } catch (error) {
       console.error('Failed to fetch door frames:', error);
     }
@@ -315,7 +413,13 @@ export default function App() {
     try {
       const res = await fetch('/api/orders');
       const data = await res.json();
-      if (data && data.length > 0) setOrders(data);
+      if (data && data.length > 0) {
+        const json = JSON.stringify(data);
+        if (json !== lastOrdersJson.current) {
+          lastOrdersJson.current = json;
+          setOrders(data);
+        }
+      }
     } catch (error) {
       console.error('Failed to fetch orders:', error);
     }
@@ -325,7 +429,13 @@ export default function App() {
     try {
       const res = await fetch('/api/trips');
       const data = await res.json();
-      if (data && data.length > 0) setTrips(data);
+      if (data && data.length > 0) {
+        const json = JSON.stringify(data);
+        if (json !== lastTripsJson.current) {
+          lastTripsJson.current = json;
+          setTrips(data);
+        }
+      }
     } catch (error) {
       console.error('Failed to fetch trips:', error);
     }
@@ -387,7 +497,13 @@ export default function App() {
   // 同步流程管理到資料庫
   useEffect(() => {
     if (!isInitialLoadComplete.current) return;
-    const sync = async () => {
+    
+    const json = JSON.stringify(processItems);
+    if (json === lastProcessItemsJson.current) return;
+    lastProcessItemsJson.current = json;
+
+    clearTimeout(syncTimeoutRef.current['process']);
+    syncTimeoutRef.current['process'] = setTimeout(async () => {
       try {
         await fetch('/api/process-items/sync', {
           method: 'POST',
@@ -397,17 +513,22 @@ export default function App() {
       } catch (error) {
         console.error('Failed to sync process items:', error);
       }
-    };
-    sync();
+    }, 500);
   }, [processItems]);
 
   // 同步零件管理到資料庫
   useEffect(() => {
     if (!isInitialLoadComplete.current) return;
-    const sync = async () => {
+    
+    // 只同步數量大於 0 的項目
+    const activeFrames = doorFrames.filter(f => f.quantity > 0);
+    const json = JSON.stringify(activeFrames);
+    if (json === lastDoorFramesJson.current) return;
+    lastDoorFramesJson.current = json;
+
+    clearTimeout(syncTimeoutRef.current['parts']);
+    syncTimeoutRef.current['parts'] = setTimeout(async () => {
       try {
-        // 只同步數量大於 0 的項目
-        const activeFrames = doorFrames.filter(f => f.quantity > 0);
         await fetch('/api/door-frames/sync', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -416,14 +537,19 @@ export default function App() {
       } catch (error) {
         console.error('Failed to sync door frames:', error);
       }
-    };
-    sync();
+    }, 500);
   }, [doorFrames]);
 
   // 同步訂單管理到資料庫
   useEffect(() => {
     if (!isInitialLoadComplete.current) return;
-    const sync = async () => {
+    
+    const json = JSON.stringify(orders);
+    if (json === lastOrdersJson.current) return;
+    lastOrdersJson.current = json;
+
+    clearTimeout(syncTimeoutRef.current['orders']);
+    syncTimeoutRef.current['orders'] = setTimeout(async () => {
       try {
         await fetch('/api/orders/sync', {
           method: 'POST',
@@ -433,14 +559,19 @@ export default function App() {
       } catch (error) {
         console.error('Failed to sync orders:', error);
       }
-    };
-    sync();
+    }, 500);
   }, [orders]);
 
   // 同步車趟排程到資料庫
   useEffect(() => {
     if (!isInitialLoadComplete.current) return;
-    const sync = async () => {
+    
+    const json = JSON.stringify(trips);
+    if (json === lastTripsJson.current) return;
+    lastTripsJson.current = json;
+
+    clearTimeout(syncTimeoutRef.current['trips']);
+    syncTimeoutRef.current['trips'] = setTimeout(async () => {
       try {
         await fetch('/api/trips/sync', {
           method: 'POST',
@@ -450,8 +581,7 @@ export default function App() {
       } catch (error) {
         console.error('Failed to sync trips:', error);
       }
-    };
-    sync();
+    }, 500);
   }, [trips]);
 
   // 零件堆疊邏輯：自動合併相同 SKU/名稱/分類/階段的項目
@@ -518,35 +648,44 @@ export default function App() {
     
     if (hasChanges) {
       setDoorFrames(nextFrames);
-      // 從資料庫刪除被合併掉的項目
-      idsToDelete.forEach(id => {
-        fetch(`/api/door-frames/${id}`, { method: 'DELETE' }).catch(err => console.error(err));
-      });
+      // 註：不再需要個別呼叫 DELETE，因為 door-frames/sync 路由會自動處理不在清單中的項目
     }
   }, [doorFrames]);
 
-  // 28天自動刪除邏輯
+  // 28天自動刪除邏輯 (流程管理) 與 90天自動刪除邏輯 (訂單與車趟)
   useEffect(() => {
     const today = new Date();
+    
+    // 流程管理清理
     setProcessItems(prev => {
-      const toDelete = prev.filter(item => {
-        if (item.section !== 'completed' || !item.createdAt) return false;
-        const createdDate = new Date(item.createdAt);
-        const diffTime = Math.abs(today.getTime() - createdDate.getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        return diffDays > 28;
-      });
-
-      toDelete.forEach(item => {
-        fetch(`/api/process-items/${item.id}`, { method: 'DELETE' }).catch(err => console.error(err));
-      });
-
       return prev.filter(item => {
         if (item.section !== 'completed' || !item.createdAt) return true;
         const createdDate = new Date(item.createdAt);
         const diffTime = Math.abs(today.getTime() - createdDate.getTime());
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         return diffDays <= 28;
+      });
+    });
+
+    // 訂單清理 (已送達且超過 90 天)
+    setOrders(prev => {
+      return prev.filter(order => {
+        if (order.status !== OrderStatus.DELIVERED || !order.createdAt) return true;
+        const createdDate = new Date(order.createdAt);
+        const diffTime = Math.abs(today.getTime() - createdDate.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays <= 90;
+      });
+    });
+
+    // 車趟清理 (已完成且超過 90 天)
+    setTrips(prev => {
+      return prev.filter(trip => {
+        if (trip.status !== TripStatus.COMPLETED || !trip.date) return true;
+        const tripDate = new Date(trip.date);
+        const diffTime = Math.abs(today.getTime() - tripDate.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays <= 90;
       });
     });
   }, []);
@@ -910,70 +1049,55 @@ export default function App() {
     });
   };
 
-  const handlePartSplit = (id: string, splitQty: number) => {
-    setDoorFrames(prev => {
-      const currentItem = prev.find(f => f.id === id);
-      if (!currentItem || splitQty <= 0 || splitQty >= currentItem.quantity) return prev;
-      
-      const newItem: DoorFrame = { 
-        ...currentItem, 
-        id: `df-split-${Date.now()}`, 
-        quantity: splitQty,
-        formula: splitQty.toString()
-      };
-
-      const remainingQty = currentItem.quantity - splitQty;
-      return prev.map(f => f.id === id ? { ...f, quantity: remainingQty, formula: remainingQty.toString() } : f).concat(newItem);
-    });
-  };
-
   const handlePartToInventory = async (frame: DoorFrame, qty: number) => {
     const targetCategory = frame.category === 'door' ? '門框' : '理想櫃';
     let targetId = '';
     
-    // 1. 更新庫存管理中的數量
-    setInventory(prev => {
-      const existingItem = prev.find(i => i.sku === frame.sku && i.category === targetCategory);
-      if (existingItem) {
-        targetId = existingItem.id;
-        return prev.map(i => i.id === existingItem.id ? { ...i, quantity: i.quantity + qty } : i);
-      } else {
-        const newId = `i-${Date.now()}`;
-        targetId = newId;
-        const newItem: InventoryItem = {
-          id: newId,
-          sku: frame.sku,
-          name: frame.name,
-          quantity: qty,
-          unit: '個',
-          category: targetCategory,
-          attribute: frame.category === 'door' ? '加框' : '抽屜',
-          dimensions: frame.dimensions,
-          weight: 0,
-          volume: (frame.dimensions.h * frame.dimensions.w * frame.dimensions.d) / 1000000000
-        };
-        
-        // 非同步同步到伺服器
-        fetch('/api/inventory/sync', {
+    // 1. 更新庫存管理中的數量 (抽屜成品不入庫)
+    if (frame.category !== 'drawer') {
+      setInventory(prev => {
+        const existingItem = prev.find(i => i.sku === frame.sku && i.category === targetCategory);
+        if (existingItem) {
+          targetId = existingItem.id;
+          return prev.map(i => i.id === existingItem.id ? { ...i, quantity: i.quantity + qty } : i);
+        } else {
+          const newId = `i-${Date.now()}`;
+          targetId = newId;
+          const newItem: InventoryItem = {
+            id: newId,
+            sku: frame.sku,
+            name: frame.name,
+            quantity: qty,
+            unit: '個',
+            category: targetCategory,
+            attribute: frame.category === 'door' ? '加框' : '抽屜',
+            dimensions: frame.dimensions,
+            weight: 0,
+            volume: (frame.dimensions.h * frame.dimensions.w * frame.dimensions.d) / 1000000000
+          };
+          
+          // 非同步同步到伺服器
+          fetch('/api/inventory/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ items: [newItem] })
+          }).catch(err => console.error('Failed to sync new item:', err));
+          
+          return [...prev, newItem];
+        }
+      });
+
+      // 如果是現有項目，更新庫存
+      if (targetId && !targetId.startsWith('i-17')) { // 簡單檢查是否為現有項目
+         fetch('/api/inventory/update-stock', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items: [newItem] })
-        }).catch(err => console.error('Failed to sync new item:', err));
-        
-        return [...prev, newItem];
+          body: JSON.stringify({ inventoryId: targetId, quantityChange: qty })
+        }).catch(err => console.error('Failed to update stock:', err));
       }
-    });
-
-    // 如果是現有項目，更新庫存
-    if (targetId && !targetId.startsWith('i-17')) { // 簡單檢查是否為現有項目
-       fetch('/api/inventory/update-stock', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ inventoryId: targetId, quantityChange: qty })
-      }).catch(err => console.error('Failed to update stock:', err));
     }
 
-    // 2. 更新零件管理中的數量 (移除已入庫的零件)
+    // 2. 更新零件管理中的數量 (移除已入庫或已完成的零件)
     setDoorFrames(prev => {
       const remainingQty = Math.max(0, frame.quantity - qty);
       if (remainingQty === 0) {
@@ -1044,7 +1168,6 @@ export default function App() {
               }}
               onQuickUpdate={(id, delta) => setDoorFrames(prev => prev.map(df => df.id === id ? { ...df, quantity: Math.max(0, df.quantity + delta) } : df))}
               onMovePart={handlePartMove}
-              onSplitPart={handlePartSplit}
               onInventoryPut={handlePartToInventory}
               onDeleteAll={handleClearPrepFrames}
             />

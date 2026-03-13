@@ -79,7 +79,6 @@ interface Props {
   onDelete: (id: string) => void;
   onQuickUpdate: (id: string, delta: number) => void;
   onMovePart: (id: string, qty: number) => void;
-  onSplitPart: (id: string, qty: number) => void;
   onInventoryPut: (frame: DoorFrame, qty: number) => void;
   onDeleteAll?: () => void;
 }
@@ -132,7 +131,7 @@ const DRAWER_CONFIGS: Record<string, string> = {
   'CB4(8S)': 'cbS:8',
 };
 
-const PartCard = ({ frame, section, onTransferClick, onSplitClick, onPutClick, onUpdate, onUpdateNote, onUpdateFormula, onDelete, onOpenDateSelector }: any) => {
+const PartCard = ({ frame, section, onTransferClick, onPutClick, onUpdate, onUpdateNote, onUpdateFormula, onDelete, onOpenDateSelector }: any) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const total = frame.quantity;
@@ -183,7 +182,11 @@ const PartCard = ({ frame, section, onTransferClick, onSplitClick, onPutClick, o
   };
 
   return (
-    <div className="p-3 border-2 rounded-2xl shadow-sm flex flex-col gap-2 group transition-all bg-slate-950 border-slate-800 hover:border-slate-700">
+    <div className={`p-3 border-2 rounded-2xl shadow-sm flex flex-col gap-2 group transition-all ${
+      frame.isPreparing 
+        ? 'bg-rose-950/40 border-rose-600/50 hover:border-rose-500' 
+        : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+    }`}>
       <div className="flex justify-between items-center px-1 gap-3">
         <div className="flex items-center gap-2 min-w-0">
           <button 
@@ -271,14 +274,6 @@ const PartCard = ({ frame, section, onTransferClick, onSplitClick, onPutClick, o
                 <div className="flex gap-1.5">
                   {!isStock ? (
                     <div className="flex gap-1.5">
-                      {section === 'prep' && (
-                        <button 
-                          onClick={() => onSplitClick(frame.id, total)} 
-                          className="px-4 py-2 bg-amber-600 text-white text-[11px] font-black rounded-xl hover:bg-amber-500 shadow-lg shadow-amber-600/20 active:scale-95 transition-all"
-                        >
-                          分割
-                        </button>
-                      )}
                       <button 
                         onClick={() => onTransferClick(frame.id, total)} 
                         className="px-4 py-2 bg-blue-600 text-white text-[11px] font-black rounded-xl hover:bg-blue-500 shadow-lg shadow-blue-600/20 active:scale-95 transition-all"
@@ -289,9 +284,9 @@ const PartCard = ({ frame, section, onTransferClick, onSplitClick, onPutClick, o
                   ) : (
                     <button 
                       onClick={() => onPutClick(frame, total)} 
-                      className="px-4 py-2 bg-emerald-600 text-white text-[11px] font-black rounded-xl hover:bg-emerald-500 shadow-lg shadow-emerald-600/20 active:scale-95 transition-all"
+                      className={`px-4 py-2 ${frame.category === 'drawer' ? 'bg-amber-600 hover:bg-amber-500 shadow-amber-600/20' : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/20'} text-white text-[11px] font-black rounded-xl shadow-lg active:scale-95 transition-all`}
                     >
-                      確認
+                      {frame.category === 'drawer' ? '完成' : '確認'}
                     </button>
                   )}
                 </div>
@@ -311,6 +306,16 @@ const PartCard = ({ frame, section, onTransferClick, onSplitClick, onPutClick, o
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-blue-400 font-black focus:ring-1 focus:ring-blue-500 outline-none"
                   />
                 </div>
+                <button 
+                  onClick={() => onUpdate({ ...frame, isPreparing: !frame.isPreparing })}
+                  className={`self-end px-4 py-2.5 text-[11px] font-black rounded-xl transition-all border ${
+                    frame.isPreparing 
+                      ? 'bg-rose-600 text-white border-rose-500 shadow-lg shadow-rose-600/20' 
+                      : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700 hover:text-white'
+                  }`}
+                >
+                  備貨中
+                </button>
                 <button 
                   onClick={() => {
                     if (isConfirmingDelete) {
@@ -337,22 +342,18 @@ const PartCard = ({ frame, section, onTransferClick, onSplitClick, onPutClick, o
   );
 };
 
-export const DoorFrameView: React.FC<Props> = ({ subView, doorFrames, inventory, onAdd, onUpdate, onDelete, onQuickUpdate, onMovePart, onSplitPart, onInventoryPut, onDeleteAll }) => {
+export const DoorFrameView: React.FC<Props> = ({ subView, doorFrames, inventory, onAdd, onUpdate, onDelete, onQuickUpdate, onMovePart, onInventoryPut, onDeleteAll }) => {
   const [modalOpen, setModalOpen] = useState(false);
   const [inventoryModalOpen, setInventoryModalOpen] = useState(false);
   const [transferModalOpen, setTransferModalOpen] = useState(false);
-  const [splitModalOpen, setSplitModalOpen] = useState(false);
   const [dateModalOpen, setDateModalOpen] = useState(false);
   
   const [editingFrame, setEditingFrame] = useState<DoorFrame | null>(null);
   const [targetTransferItem, setTargetTransferItem] = useState<DoorFrame | null>(null);
-  const [targetSplitItem, setTargetSplitItem] = useState<DoorFrame | null>(null);
   const [targetDateItem, setTargetDateItem] = useState<DoorFrame | null>(null);
   const [tempDate, setTempDate] = useState('');
   const [transferInputQty, setTransferInputQty] = useState('0');
-  const [splitInputQty, setSplitInputQty] = useState('0');
   const [maxTransferQty, setMaxTransferQty] = useState(0);
-  const [maxSplitQty, setMaxSplitQty] = useState(0);
 
   const [invSearchTerm, setInvSearchTerm] = useState('');
   const [selectedInvItem, setSelectedInvItem] = useState<InventoryItem | null>(null);
@@ -389,34 +390,31 @@ export const DoorFrameView: React.FC<Props> = ({ subView, doorFrames, inventory,
     d: 100
   });
 
-  const currentCategory = subView.startsWith('door') ? 'door' : 'drawer';
+  const isAllAll = subView === 'all-all';
+  const categoriesToShow: ('door' | 'drawer')[] = isAllAll ? ['door', 'drawer'] : [subView.startsWith('door') ? 'door' : 'drawer'];
 
-  const sections = useMemo(() => {
+  const getSections = (category: 'door' | 'drawer') => {
     const allSections = [
       { key: 'prep' as DoorFrameSection, label: '1. 預備組', color: 'bg-slate-500' },
       { 
         key: 'done' as DoorFrameSection, 
-        label: currentCategory === 'door' ? '2. 門框製作' : '2. 抽屜製作', 
+        label: category === 'door' ? '2. 門框製作' : '2. 抽屜製作', 
         color: 'bg-amber-500' 
       },
       { 
         key: 'stock' as DoorFrameSection, 
-        label: currentCategory === 'door' ? '3. 門框成品' : '3. 抽屜成品', 
+        label: category === 'door' ? '3. 門框成品' : '3. 抽屜成品', 
         color: 'bg-emerald-500' 
       },
     ];
 
-    if (subView.endsWith('-all')) return allSections;
+    if (isAllAll || subView.endsWith('-all')) return allSections;
     if (subView.endsWith('-prep')) return allSections.filter(s => s.key === 'prep');
     if (subView.endsWith('-done')) return allSections.filter(s => s.key === 'done');
     if (subView.endsWith('-stock')) return allSections.filter(s => s.key === 'stock');
     
     return allSections;
-  }, [subView, currentCategory]);
-
-  const filtered = useMemo(() => {
-    return doorFrames.filter(f => f.category === currentCategory);
-  }, [doorFrames, currentCategory]);
+  };
 
   const filteredInventory = useMemo(() => {
     const drawerItems = [
@@ -435,6 +433,13 @@ export const DoorFrameView: React.FC<Props> = ({ subView, doorFrames, inventory,
                           i.sku.toLowerCase().includes(invSearchTerm.toLowerCase());
       if (!matchSearch) return false;
 
+      // 如果是全部顯示，則顯示所有相關的
+      if (isAllAll) {
+        return drawerItems.some(item => i.name.includes(item)) || 
+               i.category === '門框' || i.name.includes('門') || i.name.includes('框');
+      }
+
+      const currentCategory = subView.startsWith('door') ? 'door' : 'drawer';
       if (currentCategory === 'drawer') {
         return drawerItems.some(item => i.name.includes(item));
       } else {
@@ -443,7 +448,7 @@ export const DoorFrameView: React.FC<Props> = ({ subView, doorFrames, inventory,
         return isDoorRelated;
       }
     });
-  }, [inventory, invSearchTerm, currentCategory]);
+  }, [inventory, invSearchTerm, subView, isAllAll]);
 
   const openEdit = (frame: DoorFrame) => {
     setEditingFrame(frame);
@@ -492,29 +497,12 @@ export const DoorFrameView: React.FC<Props> = ({ subView, doorFrames, inventory,
     setTransferModalOpen(true);
   };
 
-  const handleSplitClick = (id: string, currentTotal: number) => {
-    const frame = doorFrames.find(f => f.id === id);
-    if (!frame) return;
-    setTargetSplitItem(frame);
-    setMaxSplitQty(currentTotal - 1); // 至少留 1 個在原卡片
-    setSplitInputQty('1');
-    setSplitModalOpen(true);
-  };
-
   const handleConfirmTransfer = () => {
     if (!targetTransferItem) return;
     const qty = parseInt(transferInputQty) || 0;
     onMovePart(targetTransferItem.id, qty);
     setTransferModalOpen(false);
     setTargetTransferItem(null);
-  };
-
-  const handleConfirmSplit = () => {
-    if (!targetSplitItem) return;
-    const qty = parseInt(splitInputQty) || 0;
-    onSplitPart(targetSplitItem.id, qty);
-    setSplitModalOpen(false);
-    setTargetSplitItem(null);
   };
 
   const handleOpenDateSelector = (frame: DoorFrame) => {
@@ -532,10 +520,11 @@ export const DoorFrameView: React.FC<Props> = ({ subView, doorFrames, inventory,
 
   const handleInventoryAdd = () => {
     if (!selectedInvItem) return;
+    const category = getProductLabel(selectedInvItem.name) === '抽屜' ? 'drawer' : 'door';
     onAdd({
       sku: selectedInvItem.sku,
       name: selectedInvItem.name,
-      category: currentCategory,
+      category: category,
       material: '鋁製',
       direction: '左開',
       color: '預設色',
@@ -549,80 +538,92 @@ export const DoorFrameView: React.FC<Props> = ({ subView, doorFrames, inventory,
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 pb-20">
-      <div className={`grid grid-cols-1 ${subView === 'all' ? 'lg:grid-cols-2' : 'lg:grid-cols-1'} gap-4`}>
-      {sections.map(sec => {
-        const sectionParts = filtered.filter(f => f.section === sec.key);
+    <div className="space-y-12 animate-in fade-in duration-500 pb-20">
+      {categoriesToShow.map(cat => (
+        <div key={cat} className="space-y-6">
+          <div className="flex items-center gap-4 px-2">
+            <div className={`w-1.5 h-8 rounded-full ${cat === 'door' ? 'bg-blue-600' : 'bg-amber-600'}`}></div>
+            <h2 className="text-2xl font-black text-white tracking-tight">
+              {cat === 'door' ? '門框零件管理' : '抽屜零件管理'}
+            </h2>
+            <div className="flex-1 h-px bg-slate-800/50"></div>
+          </div>
 
-        return (
-          <div key={sec.key} className="bg-slate-900/50 border border-slate-800 rounded-[32px] p-4 flex flex-col overflow-hidden shadow-xl backdrop-blur-sm">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-black text-white flex items-center gap-2">
-                <div className={`w-3 h-3 rounded-full ${sec.color} shadow-lg shadow-${sec.color.split('-')[1]}-500/40`}></div>
-                {sec.label}
-                <span className="text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded uppercase font-black tracking-widest">
-                  {sectionParts.length}
-                </span>
-              </h3>
-              {sec.key === 'prep' && (
-                <div className="flex items-center gap-2">
-                  {sectionParts.length > 0 && (
-                    <button 
-                      onClick={() => {
-                        if (onDeleteAll) {
-                          onDeleteAll();
-                        } else {
-                          sectionParts.forEach(frame => onDelete(frame.id));
-                        }
-                      }}
-                      className="p-2.5 bg-rose-600/10 text-rose-500 rounded-xl hover:bg-rose-600 hover:text-white transition-all shadow-lg active:scale-95 border border-rose-600/20"
-                      title="一鍵刪除所有卡片"
-                    >
-                      <Icons.Trash />
-                    </button>
-                  )}
-                  <button 
-                    onClick={() => setInventoryModalOpen(true)}
-                    className="p-2.5 bg-slate-800 text-slate-400 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-lg active:scale-95 border border-slate-700"
-                  >
-                    <Icons.Plus />
-                  </button>
-                </div>
-              )}
-            </div>
-            
-            <div className="flex-1 overflow-y-auto space-y-3 pr-1 scrollbar-hide pb-6">
-                {sectionParts.map(frame => (
-                  <PartCard 
-                    key={frame.id} 
-                    frame={frame} 
-                    section={sec.key}
-                    onTransferClick={handleTransferClick}
-                    onSplitClick={handleSplitClick}
-                    onPutClick={onInventoryPut}
-                    onDelete={onDelete}
-                    onUpdate={onUpdate}
-                    onUpdateNote={(id: string, note: string) => {
-                      const f = doorFrames.find(x => x.id === id);
-                      if (f) onUpdate({ ...f, note });
-                    }}
-                    onUpdateFormula={(id: string, formula: string, quantity: number) => {
-                      const f = doorFrames.find(x => x.id === id);
-                      if (f) onUpdate({ ...f, formula, quantity });
-                    }}
-                    onOpenDateSelector={handleOpenDateSelector}
-                  />
-                ))}
-                {sectionParts.length === 0 && (
-                  <div className="flex flex-col items-center justify-center py-12 opacity-20 border-2 border-dashed border-slate-800 rounded-[24px]">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-center">目前無待處理零件</p>
+          <div className={`grid grid-cols-1 ${(isAllAll || subView.endsWith('-all')) ? 'lg:grid-cols-3' : 'lg:grid-cols-1'} gap-4`}>
+            {getSections(cat).map(sec => {
+              const sectionParts = doorFrames.filter(f => f.category === cat && f.section === sec.key);
+
+              return (
+                <div key={sec.key} className="bg-slate-900/50 border border-slate-800 rounded-[32px] p-4 flex flex-col overflow-hidden shadow-xl backdrop-blur-sm">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-xl font-black text-white flex items-center gap-2">
+                      <div className={`w-3 h-3 rounded-full ${sec.color} shadow-lg shadow-${sec.color.split('-')[1]}-500/40`}></div>
+                      {sec.label}
+                      <span className="text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded uppercase font-black tracking-widest">
+                        {sectionParts.length}
+                      </span>
+                    </h3>
+                    {sec.key === 'prep' && (
+                      <div className="flex items-center gap-2">
+                        {sectionParts.length > 0 && (
+                          <button 
+                            onClick={() => {
+                              if (onDeleteAll) {
+                                // 這裡需要區分門框或抽屜的刪除
+                                doorFrames.filter(f => f.category === cat && f.section === 'prep').forEach(frame => onDelete(frame.id));
+                              } else {
+                                sectionParts.forEach(frame => onDelete(frame.id));
+                              }
+                            }}
+                            className="p-2.5 bg-rose-600/10 text-rose-500 rounded-xl hover:bg-rose-600 hover:text-white transition-all shadow-lg active:scale-95 border border-rose-600/20"
+                            title="一鍵刪除所有卡片"
+                          >
+                            <Icons.Trash />
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => setInventoryModalOpen(true)}
+                          className="p-2.5 bg-slate-800 text-slate-400 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-lg active:scale-95 border border-slate-700"
+                        >
+                          <Icons.Plus />
+                        </button>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                  
+                  <div className="flex-1 overflow-y-auto space-y-3 pr-1 scrollbar-hide pb-6">
+                      {sectionParts.map(frame => (
+                        <PartCard 
+                          key={frame.id} 
+                          frame={frame} 
+                          section={sec.key}
+                          onTransferClick={handleTransferClick}
+                          onPutClick={onInventoryPut}
+                          onDelete={onDelete}
+                          onUpdate={onUpdate}
+                          onUpdateNote={(id: string, note: string) => {
+                            const f = doorFrames.find(x => x.id === id);
+                            if (f) onUpdate({ ...f, note });
+                          }}
+                          onUpdateFormula={(id: string, formula: string, quantity: number) => {
+                            const f = doorFrames.find(x => x.id === id);
+                            if (f) onUpdate({ ...f, formula, quantity });
+                          }}
+                          onOpenDateSelector={handleOpenDateSelector}
+                        />
+                      ))}
+                      {sectionParts.length === 0 && (
+                        <div className="flex flex-col items-center justify-center py-12 opacity-20 border-2 border-dashed border-slate-800 rounded-[24px]">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-center">目前無待處理零件</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          );
-        })}
-      </div>
+        </div>
+      ))}
 
       {/* 庫存選取 Modal */}
       {inventoryModalOpen && (
@@ -747,55 +748,7 @@ export const DoorFrameView: React.FC<Props> = ({ subView, doorFrames, inventory,
                 disabled={parseInt(transferInputQty) <= 0}
                 className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-base uppercase shadow-2xl shadow-blue-600/30 hover:bg-blue-500 transition-all disabled:opacity-50 active:scale-[0.98]"
               >
-                確認轉移至 {targetTransferItem.section === 'prep' ? (currentCategory === 'door' ? '門框製作' : '抽屜製作') : (currentCategory === 'door' ? '門框成品' : '抽屜成品')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 分割確認 Modal */}
-      {splitModalOpen && targetSplitItem && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[110] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-[32px] sm:rounded-[40px] w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200 my-auto">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg sm:text-xl font-black text-white">確認分割數量</h3>
-              <button onClick={() => setSplitModalOpen(false)} className="text-slate-500 hover:text-white">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-              </button>
-            </div>
-
-            <div className="space-y-6">
-              <div className="p-5 bg-slate-950 border border-slate-800 rounded-2xl">
-                <p className="text-sm font-black text-white mb-1">{targetSplitItem.name}</p>
-                <div className="flex justify-between items-center">
-                  <p className="text-[10px] text-slate-500 font-bold uppercase">目前可用總數</p>
-                  <p className="text-lg font-black text-amber-500">{targetSplitItem.quantity}</p>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-black text-slate-500 mb-2 block uppercase tracking-widest">欲分割出的數量</label>
-                <input 
-                  type="text" inputMode="numeric"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-2xl py-4 px-6 text-4xl font-black text-center text-amber-400 focus:ring-2 focus:ring-amber-600 outline-none shadow-inner"
-                  value={splitInputQty}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(/[^0-9]/g, '');
-                    const n = parseInt(val) || 0;
-                    setSplitInputQty(Math.min(n, maxSplitQty).toString());
-                  }}
-                  autoFocus
-                />
-                <p className="text-[10px] text-slate-600 mt-2 text-center font-bold">分割後原項目將保留 {targetSplitItem.quantity - (parseInt(splitInputQty) || 0)} 個</p>
-              </div>
-
-              <button 
-                onClick={handleConfirmSplit}
-                disabled={parseInt(splitInputQty) <= 0}
-                className="w-full py-5 bg-amber-600 text-white rounded-2xl font-black text-base uppercase shadow-2xl shadow-amber-600/30 hover:bg-amber-500 transition-all disabled:opacity-50 active:scale-[0.98]"
-              >
-                確認分割
+                確認轉移至 {targetTransferItem.section === 'prep' ? (targetTransferItem.category === 'door' ? '門框製作' : '抽屜製作') : (targetTransferItem.category === 'door' ? '門框成品' : '抽屜成品')}
               </button>
             </div>
           </div>

@@ -30,6 +30,7 @@ export interface ProcessItem {
   createdAt?: string; // 格式: YYYY-MM-DD
   targetDate?: string; // 格式: YYYY-MM-DD
   isSyncedToParts?: boolean;
+  sortOrder?: number;
 }
 
 export interface Company {
@@ -79,6 +80,7 @@ export interface DoorFrame {
     w: number;
     d: number;
   };
+  sortOrder?: number;
 }
 
 export interface OrderItem {
@@ -122,5 +124,6 @@ export interface Trip {
 export type ViewType = 'dashboard' | 'inventory' | 'orders' | 'trips' | 'stacking' | 'process' | 'parts';
 
 export type PartsSection = 
+  | 'all-all'
   | 'door-all' | 'door-prep' | 'door-done' | 'door-stock'
   | 'drawer-all' | 'drawer-prep' | 'drawer-done' | 'drawer-stock';

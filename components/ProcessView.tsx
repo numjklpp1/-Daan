@@ -525,7 +525,7 @@ export const ProcessView: React.FC<Props> = ({ subView, items, inventory, onUpda
       onDragEnd={handleDragEnd}
       onDragCancel={() => setActiveId(null)}
     >
-      <div className={`grid grid-cols-1 ${subView === 'all' ? 'lg:grid-cols-2' : 'lg:grid-cols-1'} gap-4`}>
+      <div className={`grid grid-cols-1 ${subView === 'all' ? 'lg:grid-cols-3' : 'lg:grid-cols-1'} gap-4`}>
         {filteredSections.map(sec => {
           const sectionItems = items.filter(i => i.section === sec.key);
 
