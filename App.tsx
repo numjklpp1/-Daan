@@ -767,6 +767,31 @@ export default function App() {
   const handleUpdateProcessItems = (update: ProcessItem[] | ((prev: ProcessItem[]) => ProcessItem[])) => {
     setProcessItems(prev => {
       const next = typeof update === 'function' ? update(prev) : update;
+      
+      // 找出有變動的項目並發送 PATCH 請求
+      next.forEach(newItem => {
+        const oldItem = prev.find(p => p.id === newItem.id);
+        if (oldItem && JSON.stringify(oldItem) !== JSON.stringify(newItem)) {
+          const updates: any = {};
+          if (newItem.quantity !== oldItem.quantity) updates.quantity = newItem.quantity;
+          if (newItem.section !== oldItem.section) updates.section = newItem.section;
+          if (newItem.formula !== oldItem.formula) updates.formula = newItem.formula;
+          if (newItem.note !== oldItem.note) updates.note = newItem.note;
+          if (newItem.isPreparing !== oldItem.isPreparing) updates.isPreparing = newItem.isPreparing;
+          if (newItem.targetDate !== oldItem.targetDate) updates.targetDate = newItem.targetDate;
+          if (newItem.sortOrder !== oldItem.sortOrder) updates.sortOrder = newItem.sortOrder;
+          if (newItem.isSyncedToParts !== oldItem.isSyncedToParts) updates.isSyncedToParts = newItem.isSyncedToParts;
+
+          if (Object.keys(updates).length > 0) {
+            fetch(`/api/process-items/${newItem.id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(updates)
+            }).catch(err => console.error('Failed to patch item:', err));
+          }
+        }
+      });
+
       // 為所有改變的項目更新時間戳
       return next.map(item => {
         const oldItem = prev.find(p => p.id === item.id);
@@ -858,6 +883,15 @@ export default function App() {
     if (hasNewParts || newlySyncedIds.length > 0) {
       if (newlySyncedIds.length > 0) {
         setProcessItems(prev => prev.map(p => newlySyncedIds.includes(p.id) ? { ...p, isSyncedToParts: true } : p));
+        
+        // 立即同步到伺服器
+        newlySyncedIds.forEach(id => {
+          fetch(`/api/process-items/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ isSyncedToParts: true })
+          }).catch(err => console.error('Failed to patch isSyncedToParts:', err));
+        });
       }
 
       if (newParts.length > 0) {
@@ -898,11 +932,44 @@ export default function App() {
       const remainingQty = Math.max(0, item.quantity - moveQty);
 
       if (remainingQty === 0) {
-        // 全量轉移，直接更新該項目的 section，不刪除舊 ID
+        // 全量轉移
+        if (isFullMove) {
+          // 關鍵：全量轉移時，只更新 section，不傳送 quantity，以保留其他裝置可能的數量更新
+          fetch(`/api/process-items/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              section: nextSection, 
+              formula: moveQty.toString(),
+              createdAt: newItem.createdAt,
+              updatedAt: newItem.updatedAt 
+            })
+          }).catch(err => console.error('Failed to move item (full):', err));
+        }
         return prev.map(i => i.id === id ? newItem : i);
       } else {
-        // 部分轉移，保留原項目並新增一個新 ID 的項目
-        return prev.map(i => i.id === id ? { ...i, quantity: remainingQty, formula: remainingQty.toString(), updatedAt: new Date().toISOString() } : i).concat(newItem);
+        // 部分轉移
+        const updatedOldItem = { ...item, quantity: remainingQty, formula: remainingQty.toString(), updatedAt: new Date().toISOString() };
+        
+        // 更新舊項目數量
+        fetch(`/api/process-items/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            quantity: remainingQty, 
+            formula: remainingQty.toString(),
+            updatedAt: updatedOldItem.updatedAt 
+          })
+        }).catch(err => console.error('Failed to update old item (partial):', err));
+
+        // 建立新項目
+        fetch('/api/process-items', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newItem)
+        }).catch(err => console.error('Failed to create new item (partial):', err));
+
+        return prev.map(i => i.id === id ? updatedOldItem : i).concat(newItem);
       }
     });
   };
@@ -967,6 +1034,13 @@ export default function App() {
     
     setProcessItems(prev => [...prev, newItem]);
 
+    // 立即同步到伺服器
+    fetch('/api/process-items', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newItem)
+    }).catch(err => console.error('Failed to add item to server:', err));
+
     // 如果是「加框」貨品且加入「預備組」，且「不是備貨中」，扣掉「門框」類別的庫存
     if (item.section === 'prep' && !item.isPreparing) {
       const label = getProductLabel(item.name);
@@ -1026,11 +1100,40 @@ export default function App() {
       const remainingQty = Math.max(0, currentItem.quantity - qty);
 
       if (remainingQty === 0) {
-        // 全量完成，直接更新該項目的 section
+        // 全量完成
+        if (isFullPut) {
+          fetch(`/api/process-items/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              section: 'completed', 
+              createdAt: newItem.createdAt,
+              updatedAt: newItem.updatedAt 
+            })
+          }).catch(err => console.error('Failed to put item (full):', err));
+        }
         return prev.map(i => i.id === id ? newItem : i);
       } else {
-        // 部分完成，保留原項目並新增一個新 ID 的項目
-        return prev.map(i => i.id === id ? { ...i, quantity: remainingQty, formula: remainingQty.toString(), updatedAt: new Date().toISOString() } : i).concat(newItem);
+        // 部分完成
+        const updatedOldItem = { ...currentItem, quantity: remainingQty, formula: remainingQty.toString(), updatedAt: new Date().toISOString() };
+        
+        fetch(`/api/process-items/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            quantity: remainingQty, 
+            formula: remainingQty.toString(),
+            updatedAt: updatedOldItem.updatedAt 
+          })
+        }).catch(err => console.error('Failed to update old item (put partial):', err));
+
+        fetch('/api/process-items', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newItem)
+        }).catch(err => console.error('Failed to create new item (put partial):', err));
+
+        return prev.map(i => i.id === id ? updatedOldItem : i).concat(newItem);
       }
     });
   };

@@ -165,6 +165,36 @@ app.get("/api/process-items", async (req, res) => {
   }
 });
 
+app.post("/api/process-items", async (req, res) => {
+  const item = req.body;
+  try {
+    const updatedAt = item.updatedAt || new Date().toISOString();
+    await sql`
+      INSERT INTO process_items (id, inventory_id, name, quantity, section, note, formula, is_preparing, created_at, target_date, is_synced_to_parts, sort_order, updated_at)
+      VALUES (
+        ${item.id}, 
+        ${item.inventoryId}, 
+        ${item.name}, 
+        ${item.quantity}, 
+        ${item.section}, 
+        ${item.note}, 
+        ${item.formula}, 
+        ${item.isPreparing ? 1 : 0}, 
+        ${item.createdAt}, 
+        ${item.targetDate}, 
+        ${item.isSyncedToParts ? 1 : 0},
+        ${item.sortOrder || 0},
+        ${updatedAt}
+      )
+    `;
+    res.json({ success: true });
+    req.app.get("io")?.emit("process_items_updated");
+  } catch (error) {
+    console.error("Create error:", error);
+    res.status(500).json({ error: "Failed to create process item" });
+  }
+});
+
 app.post("/api/process-items/sync", async (req, res) => {
   const { items } = req.body;
   try {
@@ -223,6 +253,39 @@ app.delete("/api/process-items/:id", async (req, res) => {
     req.app.get("io")?.emit("process_items_updated");
   } catch (error) {
     res.status(500).json({ error: "Failed to delete process item" });
+  }
+});
+
+app.patch("/api/process-items/:id", async (req, res) => {
+  const { id } = req.params;
+  const updates = req.body;
+  try {
+    const updatedAt = new Date().toISOString();
+    
+    // 使用 CASE WHEN 模式來處理動態欄位更新，確保安全且符合 neon 的 template tag 語法
+    await sql`
+      UPDATE process_items 
+      SET 
+        inventory_id = CASE WHEN ${updates.inventoryId !== undefined} THEN ${updates.inventoryId} ELSE inventory_id END,
+        name = CASE WHEN ${updates.name !== undefined} THEN ${updates.name} ELSE name END,
+        quantity = CASE WHEN ${updates.quantity !== undefined} THEN ${updates.quantity} ELSE quantity END,
+        section = CASE WHEN ${updates.section !== undefined} THEN ${updates.section} ELSE section END,
+        note = CASE WHEN ${updates.note !== undefined} THEN ${updates.note} ELSE note END,
+        formula = CASE WHEN ${updates.formula !== undefined} THEN ${updates.formula} ELSE formula END,
+        is_preparing = CASE WHEN ${updates.isPreparing !== undefined} THEN ${updates.isPreparing} ELSE is_preparing END,
+        created_at = CASE WHEN ${updates.createdAt !== undefined} THEN ${updates.createdAt} ELSE created_at END,
+        target_date = CASE WHEN ${updates.targetDate !== undefined} THEN ${updates.targetDate} ELSE target_date END,
+        is_synced_to_parts = CASE WHEN ${updates.isSyncedToParts !== undefined} THEN ${updates.isSyncedToParts} ELSE is_synced_to_parts END,
+        sort_order = CASE WHEN ${updates.sortOrder !== undefined} THEN ${updates.sortOrder} ELSE sort_order END,
+        updated_at = ${updatedAt}
+      WHERE id = ${id}
+    `;
+    
+    res.json({ success: true });
+    req.app.get("io")?.emit("process_items_updated");
+  } catch (error) {
+    console.error("Patch error:", error);
+    res.status(500).json({ error: "Failed to update process item" });
   }
 });
 
