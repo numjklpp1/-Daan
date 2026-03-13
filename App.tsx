@@ -202,7 +202,8 @@ export default function App() {
     const saved = localStorage.getItem('tripflow_inventory');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
       } catch (e) {
         console.error('Failed to parse saved inventory', e);
       }
@@ -267,7 +268,8 @@ export default function App() {
     const saved = localStorage.getItem('tripflow_doorFrames');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
       } catch (e) {
         console.error('Failed to parse saved doorFrames', e);
       }
@@ -289,7 +291,8 @@ export default function App() {
     const saved = localStorage.getItem('tripflow_orders');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
       } catch (e) {
         console.error('Failed to parse saved orders', e);
       }
@@ -308,7 +311,8 @@ export default function App() {
     const saved = localStorage.getItem('tripflow_trips');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
       } catch (e) {
         console.error('Failed to parse saved trips', e);
       }
@@ -326,7 +330,8 @@ export default function App() {
     const saved = localStorage.getItem('tripflow_processItems');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
       } catch (e) {
         console.error('Failed to parse saved processItems', e);
       }
@@ -356,7 +361,11 @@ export default function App() {
     try {
       const res = await fetch('/api/inventory');
       const data = await res.json();
-      if (data) setInventory(data);
+      if (Array.isArray(data)) {
+        setInventory(data);
+      } else {
+        console.error('Inventory data is not an array:', data);
+      }
     } catch (error) {
       console.error('Failed to fetch inventory:', error);
     }
@@ -366,7 +375,7 @@ export default function App() {
     try {
       const res = await fetch('/api/process-items');
       const data = await res.json();
-      if (data) {
+      if (Array.isArray(data)) {
         const normalized = data.map((p: any) => ({
           ...p,
           isSyncedToParts: !!p.isSyncedToParts,
@@ -387,6 +396,8 @@ export default function App() {
           }
         });
         syncedProcessItemsRef.current = syncedIds;
+      } else {
+        console.error('Process items data is not an array:', data);
       }
     } catch (error) {
       console.error('Failed to fetch process items:', error);
@@ -397,12 +408,14 @@ export default function App() {
     try {
       const res = await fetch('/api/door-frames');
       const data = await res.json();
-      if (data) {
+      if (Array.isArray(data)) {
         const json = JSON.stringify(data);
         if (json !== lastDoorFramesJson.current) {
           lastDoorFramesJson.current = json;
           setDoorFrames(data);
         }
+      } else {
+        console.error('Door frames data is not an array:', data);
       }
     } catch (error) {
       console.error('Failed to fetch door frames:', error);
@@ -413,12 +426,14 @@ export default function App() {
     try {
       const res = await fetch('/api/orders');
       const data = await res.json();
-      if (data && data.length > 0) {
+      if (Array.isArray(data)) {
         const json = JSON.stringify(data);
         if (json !== lastOrdersJson.current) {
           lastOrdersJson.current = json;
           setOrders(data);
         }
+      } else {
+        console.error('Orders data is not an array:', data);
       }
     } catch (error) {
       console.error('Failed to fetch orders:', error);
@@ -429,12 +444,14 @@ export default function App() {
     try {
       const res = await fetch('/api/trips');
       const data = await res.json();
-      if (data && data.length > 0) {
+      if (Array.isArray(data)) {
         const json = JSON.stringify(data);
         if (json !== lastTripsJson.current) {
           lastTripsJson.current = json;
           setTrips(data);
         }
+      } else {
+        console.error('Trips data is not an array:', data);
       }
     } catch (error) {
       console.error('Failed to fetch trips:', error);
